@@ -46,6 +46,14 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         help="Ignora checkpoints previos y comienza desde cero.",
     )
     parser.add_argument(
+        "--allow-scenario-resume",
+        action="store_true",
+        help=(
+            "Permite usar un checkpoint de otro escenario cuando la arquitectura "
+            "del modelo es compatible. Usalo solo para transferencia explicita."
+        ),
+    )
+    parser.add_argument(
         "--eval-freq",
         type=int,
         default=None,
@@ -87,6 +95,7 @@ def main() -> None:
         eval_frequency=args.eval_freq,
         eval_episodes=args.eval_episodes,
         save_best=not args.no_save_best,
+        allow_scenario_resume=args.allow_scenario_resume,
     )
 
 

@@ -33,9 +33,28 @@ class TrainingProfileTests(unittest.TestCase):
         profile = get_training_profile("fast", scenario_name="deadly_corridor")
         self.assertEqual(profile.scenario_key, "deadly_corridor")
         self.assertEqual(profile.scenario_name, "deadly_corridor.cfg")
+        self.assertEqual(profile.action_combo_preset, "basic_combat")
         self.assertIn("__deadly_corridor", profile.checkpoint_name)
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)
         self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
+    def test_basic_scenario_uses_combat_action_preset(self) -> None:
+        profile = get_training_profile("fast")
+        self.assertEqual(profile.action_combo_preset, "basic_combat")
+
+    def test_scenarios_use_focused_action_presets(self) -> None:
+        self.assertEqual(
+            get_training_profile("fast", scenario_name="deadly_corridor").action_combo_preset,
+            "basic_combat",
+        )
+        self.assertEqual(
+            get_training_profile("fast", scenario_name="defend_the_center").action_combo_preset,
+            "turn_combat",
+        )
+        self.assertEqual(
+            get_training_profile("fast", scenario_name="health_gathering").action_combo_preset,
+            "health_navigation",
+        )
 
     def test_reward_shaping_applies_scale_offset_and_clip(self) -> None:
         shaping = RewardShapingConfig(scale=0.5, offset=1.0, clip_min=-2.0, clip_max=3.0)
@@ -55,6 +74,19 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual([stage.scenario_key for stage in stages], ["basic", "defend_the_center", "health_gathering"])
         self.assertEqual([stage.seed for stage in stages], [100, 101, 102])
         self.assertTrue(all(stage.requested_timesteps == 2048 for stage in stages))
+
+    def test_all_scenarios_profile_chains_every_scenario(self) -> None:
+        stages = materialize_curriculum_profiles("all_scenarios", seed=200)
+        self.assertEqual(len(stages), 4)
+        self.assertEqual(
+            [stage.scenario_key for stage in stages],
+            ["basic", "defend_the_center", "deadly_corridor", "health_gathering"],
+        )
+        self.assertEqual([stage.seed for stage in stages], [200, 201, 202, 203])
+        self.assertEqual(stages[0].requested_timesteps, 50000)
+        self.assertEqual(stages[1].requested_timesteps, 250000)
+        self.assertEqual(stages[2].requested_timesteps, 300000)
+        self.assertEqual(stages[3].requested_timesteps, 150000)
 
     def test_profiles_are_valid_against_existing_scenarios(self) -> None:
         project_paths = build_project_paths()

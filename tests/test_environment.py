@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
+import gymnasium as gym
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
 from doom_agent.envs import make_vectorized_env
+from doom_agent.envs.doom_env import build_button_combination_actions, has_opposing_buttons
 
 
 class EnvironmentSmokeTests(unittest.TestCase):
-    def test_environment_reset_and_step_support_combined_actions(self) -> None:
+    def test_environment_reset_and_step_supports_button_combinations(self) -> None:
         project_paths = build_project_paths()
         profile = get_training_profile("fast")
         env = make_vectorized_env(profile, project_paths)
@@ -25,8 +28,17 @@ class EnvironmentSmokeTests(unittest.TestCase):
                 observation.shape,
                 (1, profile.frame_stack, profile.screen_height, profile.screen_width),
             )
+            self.assertIsInstance(env.action_space, gym.spaces.Discrete)
+            discrete_action_space = cast(gym.spaces.Discrete[Any], env.action_space)
+            self.assertEqual(discrete_action_space.n, 3)
+            self.assertNotIn("NOOP", env.get_attr("action_labels")[0])
+            self.assertNotIn("MOVE_LEFT", env.get_attr("action_labels")[0])
+            self.assertNotIn("MOVE_RIGHT", env.get_attr("action_labels")[0])
+            self.assertIn("ATTACK", env.get_attr("action_labels")[0])
+            self.assertIn("MOVE_LEFT+ATTACK", env.get_attr("action_labels")[0])
+            self.assertIn("MOVE_RIGHT+ATTACK", env.get_attr("action_labels")[0])
 
-            step_result = env.step(np.array([[1, 0, 1]], dtype=np.int64))
+            step_result = env.step(np.array([1], dtype=np.int64))
             observation = cast(np.ndarray, step_result[0])
             rewards, dones = step_result[1], step_result[2]
             self.assertEqual(
@@ -37,3 +49,99 @@ class EnvironmentSmokeTests(unittest.TestCase):
             self.assertEqual(dones.shape, (1,))
         finally:
             env.close()
+
+    def test_environment_still_supports_legacy_multidiscrete_actions(self) -> None:
+        project_paths = build_project_paths()
+        profile = replace(get_training_profile("fast"), action_space_kind="multidiscrete")
+        env = make_vectorized_env(profile, project_paths)
+
+        try:
+            env.reset()
+            step_result = env.step(np.array([[1, 0, 1]], dtype=np.int64))
+            observation = cast(np.ndarray, step_result[0])
+            self.assertEqual(
+                observation.shape,
+                (1, profile.frame_stack, profile.screen_height, profile.screen_width),
+            )
+        finally:
+            env.close()
+
+    def test_button_combination_actions_exclude_opposites(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("MOVE_LEFT", "MOVE_RIGHT", "ATTACK")
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 6)
+        self.assertIn("NOOP", readable_labels)
+        self.assertIn("MOVE_LEFT", readable_labels)
+        self.assertIn("MOVE_RIGHT", readable_labels)
+        self.assertIn("ATTACK", readable_labels)
+        self.assertIn("MOVE_LEFT+ATTACK", readable_labels)
+        self.assertIn("MOVE_RIGHT+ATTACK", readable_labels)
+        self.assertFalse(any(has_opposing_buttons(set(label)) for label in labels))
+
+    def test_basic_combat_actions_only_include_attack_actions(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("MOVE_LEFT", "MOVE_RIGHT", "ATTACK"),
+            preset="basic_combat",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 3)
+        self.assertEqual(
+            readable_labels,
+            ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+        )
+        self.assertTrue(all("ATTACK" in label for label in labels))
+
+    def test_turn_combat_actions_only_include_attack_actions(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("TURN_LEFT", "TURN_RIGHT", "ATTACK"),
+            preset="turn_combat",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 3)
+        self.assertEqual(
+            readable_labels,
+            ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
+        )
+        self.assertTrue(all("ATTACK" in label for label in labels))
+
+    def test_health_navigation_actions_keep_moving_forward(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("TURN_LEFT", "TURN_RIGHT", "MOVE_FORWARD"),
+            preset="health_navigation",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 3)
+        self.assertEqual(
+            readable_labels,
+            ("MOVE_FORWARD", "TURN_LEFT+MOVE_FORWARD", "TURN_RIGHT+MOVE_FORWARD"),
+        )
+        self.assertTrue(all("MOVE_FORWARD" in label for label in labels))
+
+    def test_focused_action_presets_match_available_scenario_buttons(self) -> None:
+        project_paths = build_project_paths()
+
+        scenario_expectations = {
+            "basic": ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+            "deadly_corridor": ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+            "defend_the_center": ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
+            "health_gathering": (
+                "MOVE_FORWARD",
+                "TURN_LEFT+MOVE_FORWARD",
+                "TURN_RIGHT+MOVE_FORWARD",
+            ),
+        }
+
+        for scenario_name, expected_labels in scenario_expectations.items():
+            with self.subTest(scenario=scenario_name):
+                profile = get_training_profile("fast", scenario_name=scenario_name)
+                env = make_vectorized_env(profile, project_paths)
+                try:
+                    self.assertEqual(env.get_attr("action_labels")[0], expected_labels)
+                finally:
+                    env.close()

@@ -9,6 +9,7 @@ from typing import cast
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
+from doom_agent.services.trainer import TrainingExecutionResult, select_curriculum_resume_path
 from doom_agent.services.training_support import resolve_resume_state
 from doom_agent.shared.contracts import CheckpointMetadataPayload, EvaluationMetricsPayload
 from doom_agent.utils.checkpoints import (
@@ -126,6 +127,34 @@ class CheckpointTests(unittest.TestCase):
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)
 
+    def test_resolve_resume_state_allows_explicit_scenario_transfer(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "resume-scenario-transfer"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        project_paths = build_project_paths(root_dir=root_dir)
+        project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+        previous_profile = get_training_profile("fast", scenario_name="basic")
+        current_profile = get_training_profile("fast", scenario_name="defend_the_center")
+        checkpoint_stem = project_paths.checkpoints_dir / previous_profile.checkpoint_name
+
+        try:
+            save_checkpoint_bundle(
+                DummyModel(),
+                checkpoint_stem,
+                build_checkpoint_metadata("fast", previous_profile, saved_timesteps=10000),
+            )
+
+            resume_state = resolve_resume_state(
+                project_paths,
+                current_profile,
+                resume_mode=str(checkpoint_stem),
+                allow_scenario_change=True,
+            )
+
+            self.assertTrue(resume_state.is_resumed)
+        finally:
+            shutil.rmtree(root_dir, ignore_errors=True)
+
     def test_resolve_checkpoint_preference_prefers_best_checkpoint(self) -> None:
         root_dir = Path("artifacts") / "test-temp" / "best-selection"
         shutil.rmtree(root_dir, ignore_errors=True)
@@ -160,5 +189,32 @@ class CheckpointTests(unittest.TestCase):
                 preference="best",
             )
             self.assertEqual(resolved.checkpoint_stem, best_checkpoint)
+        finally:
+            shutil.rmtree(root_dir, ignore_errors=True)
+
+    def test_curriculum_resume_prefers_best_checkpoint_when_available(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "curriculum-best-selection"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        checkpoint_dir = root_dir / "checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        final_checkpoint_path = checkpoint_dir / "stage.zip"
+        best_checkpoint_path = checkpoint_dir / "stage_best.zip"
+        final_checkpoint_path.write_text("final", encoding="utf-8")
+        best_checkpoint_path.write_text("best", encoding="utf-8")
+
+        try:
+            result = TrainingExecutionResult(
+                profile_name="fast",
+                profile=get_training_profile("fast"),
+                final_checkpoint_path=final_checkpoint_path,
+                report_path=root_dir / "report.json",
+                training_status="completed",
+                completed=True,
+                saved_timesteps=1000,
+                stopped_early=False,
+                stop_reason=None,
+            )
+
+            self.assertEqual(select_curriculum_resume_path(result), best_checkpoint_path)
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)

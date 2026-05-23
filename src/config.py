@@ -34,6 +34,7 @@ def _profile_to_legacy_config(profile: TrainingProfile) -> LegacyConfigPayload:
         "screen_width": profile.screen_width,
         "screen_height": profile.screen_height,
         "seed": profile.seed,
+        "action_combo_preset": profile.action_combo_preset,
         "scenario_key": profile.scenario_key,
         "scenario_description": profile.scenario_description,
         "reward_shaping": profile.reward_shaping.to_dict(),

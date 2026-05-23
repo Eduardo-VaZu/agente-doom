@@ -18,8 +18,16 @@ from stable_baselines3.common.vec_env import (
 
 from doom_agent.config.schema import ProjectPaths, TrainingProfile
 from doom_agent.envs.reward import RewardShaper
-from doom_agent.shared.types import BinaryAction, Observation
+from doom_agent.shared.types import AgentAction, BinaryAction, Observation
 from doom_agent.utils.filesystem import ensure_directories
+
+OPPOSING_BUTTON_PAIRS = frozenset(
+    {
+        frozenset(("MOVE_LEFT", "MOVE_RIGHT")),
+        frozenset(("TURN_LEFT", "TURN_RIGHT")),
+        frozenset(("MOVE_FORWARD", "MOVE_BACKWARD")),
+    }
+)
 
 
 def normalize_rgb_frame(frame: np.ndarray) -> np.ndarray:
@@ -37,7 +45,80 @@ def preprocess_frame(frame: np.ndarray, width: int, height: int) -> Observation:
     return resized.reshape(1, height, width).astype(np.uint8)
 
 
-class DoomEnv(gym.Env[Observation, BinaryAction]):
+def button_name(button: object) -> str:
+    name = getattr(button, "name", None)
+    if isinstance(name, str):
+        return name
+    return str(button).rsplit(".", maxsplit=1)[-1]
+
+
+def has_opposing_buttons(button_names: set[str]) -> bool:
+    return any(pair.issubset(button_names) for pair in OPPOSING_BUTTON_PAIRS)
+
+
+def build_button_combination_actions(
+    available_button_names: tuple[str, ...],
+    preset: str = "default",
+) -> tuple[tuple[tuple[str, ...], ...], tuple[BinaryAction, ...]]:
+    actions: list[BinaryAction] = []
+    labels: list[tuple[str, ...]] = []
+    button_index = {button_name: index for index, button_name in enumerate(available_button_names)}
+
+    def add_action(selected_buttons: tuple[str, ...]) -> None:
+        missing_buttons = set(selected_buttons) - set(button_index)
+        if missing_buttons:
+            raise ValueError(
+                "El preset de acciones requiere botones no disponibles: "
+                f"{', '.join(sorted(missing_buttons))}."
+            )
+
+        selected_button_set = set(selected_buttons)
+        if has_opposing_buttons(selected_button_set):
+            return
+
+        encoded_action = np.zeros(len(available_button_names), dtype=np.int32)
+        for selected_button in selected_buttons:
+            encoded_action[button_index[selected_button]] = 1
+
+        if any(np.array_equal(encoded_action, existing_action) for existing_action in actions):
+            return
+
+        actions.append(encoded_action)
+        labels.append(selected_buttons)
+
+    if preset == "basic_combat":
+        add_action(("ATTACK",))
+        add_action(("MOVE_LEFT", "ATTACK"))
+        add_action(("MOVE_RIGHT", "ATTACK"))
+        return tuple(labels), tuple(actions)
+
+    if preset == "turn_combat":
+        add_action(("ATTACK",))
+        add_action(("TURN_LEFT", "ATTACK"))
+        add_action(("TURN_RIGHT", "ATTACK"))
+        return tuple(labels), tuple(actions)
+
+    if preset == "health_navigation":
+        add_action(("MOVE_FORWARD",))
+        add_action(("TURN_LEFT", "MOVE_FORWARD"))
+        add_action(("TURN_RIGHT", "MOVE_FORWARD"))
+        return tuple(labels), tuple(actions)
+
+    actions.append(np.zeros(len(available_button_names), dtype=np.int32))
+    labels.append(("NOOP",))
+
+    for available_button_name in available_button_names:
+        add_action((available_button_name,))
+
+    if "ATTACK" in button_index:
+        for available_button_name in available_button_names:
+            if available_button_name != "ATTACK":
+                add_action((available_button_name, "ATTACK"))
+
+    return tuple(labels), tuple(actions)
+
+
+class DoomEnv(gym.Env[Observation, AgentAction]):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 35}
 
     def __init__(
@@ -46,6 +127,7 @@ class DoomEnv(gym.Env[Observation, BinaryAction]):
         observation_width: int,
         observation_height: int,
         action_space_kind: str,
+        action_combo_preset: str,
         render_mode: str,
         reward_shaper: RewardShaper,
     ) -> None:
@@ -55,11 +137,23 @@ class DoomEnv(gym.Env[Observation, BinaryAction]):
         self.observation_height = observation_height
         self.button_count = self.game.get_available_buttons_size()
         self.action_space_kind = action_space_kind
+        self.action_combo_preset = action_combo_preset
         self.render_mode = render_mode
         self.reward_shaper = reward_shaper
+        self.available_button_names = tuple(button_name(button) for button in self.game.get_available_buttons())
+        self.action_labels: tuple[str, ...] = ()
+        self.action_definitions: tuple[BinaryAction, ...] = ()
         self.action_space: gym.Space[Any]
 
-        if self.action_space_kind == "multidiscrete":
+        if self.action_space_kind == "button_combinations":
+            labels, actions = build_button_combination_actions(
+                self.available_button_names,
+                preset=self.action_combo_preset,
+            )
+            self.action_labels = tuple("+".join(label) for label in labels)
+            self.action_definitions = actions
+            self.action_space = gym.spaces.Discrete(len(self.action_definitions))
+        elif self.action_space_kind == "multidiscrete":
             self.action_space = gym.spaces.MultiDiscrete(
                 np.full(self.button_count, 2, dtype=np.int64)
             )
@@ -74,8 +168,8 @@ class DoomEnv(gym.Env[Observation, BinaryAction]):
 
     def step(
         self,
-        action: BinaryAction,
-    ) -> tuple[Observation, float, bool, bool, dict[str, float]]:
+        action: AgentAction,
+    ) -> tuple[Observation, float, bool, bool, dict[str, object]]:
         binary_action = self._normalize_action(action)
         raw_reward = float(self.game.make_action(binary_action.tolist()))
         reward = self.reward_shaper.apply(raw_reward)
@@ -83,7 +177,11 @@ class DoomEnv(gym.Env[Observation, BinaryAction]):
         terminated = self.game.is_episode_finished()
         truncated = False
         observation = self._observation_from_state(state)
-        info = {"raw_reward": raw_reward, "shaped_reward": reward}
+        info: dict[str, object] = {"raw_reward": raw_reward, "shaped_reward": reward}
+        if self.action_space_kind == "button_combinations":
+            action_index = int(np.asarray(action).item())
+            info["action_index"] = action_index
+            info["action_label"] = self.action_labels[action_index]
         return observation, reward, terminated, truncated, info
 
     def reset(
@@ -105,7 +203,15 @@ class DoomEnv(gym.Env[Observation, BinaryAction]):
     def close(self) -> None:
         self.game.close()
 
-    def _normalize_action(self, action: BinaryAction) -> BinaryAction:
+    def _normalize_action(self, action: AgentAction) -> BinaryAction:
+        if self.action_space_kind == "button_combinations":
+            action_index = int(np.asarray(action).item())
+            if action_index < 0 or action_index >= len(self.action_definitions):
+                raise ValueError(
+                    f"La accion debe estar entre 0 y {len(self.action_definitions) - 1}."
+                )
+            return self.action_definitions[action_index].copy()
+
         if self.action_space_kind == "discrete":
             discrete_action = int(np.asarray(action).item())
             if discrete_action < 0 or discrete_action >= self.button_count:
@@ -158,6 +264,7 @@ def make_vectorized_env(profile: TrainingProfile, project_paths: ProjectPaths) -
             observation_width=profile.screen_width,
             observation_height=profile.screen_height,
             action_space_kind=profile.action_space_kind,
+            action_combo_preset=profile.action_combo_preset,
             render_mode="rgb_array",
             reward_shaper=RewardShaper(profile.reward_shaping),
         )

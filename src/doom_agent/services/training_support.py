@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from math import inf
 from pathlib import Path
@@ -235,6 +236,8 @@ class PeriodicTrainingCallback(BaseCallback):
             best_mean_reward=self.best_mean_reward,
         )
         self.last_evaluation_metrics: EvaluationMetricsPayload | None = None
+        self.action_counts: Counter[int] = Counter()
+        self.action_labels: tuple[str, ...] = ()
 
     def _on_training_start(self) -> None:
         current_timesteps = self.model.num_timesteps
@@ -242,8 +245,10 @@ class PeriodicTrainingCallback(BaseCallback):
             current_timesteps, self.profile.checkpoint_frequency
         )
         self.next_eval_step = _next_multiple(current_timesteps, self.evaluation_settings.frequency)
+        self.action_labels = self._load_action_labels()
 
     def _on_step(self) -> bool:
+        self._record_actions()
         if self.num_timesteps >= self.next_eval_step:
             self._run_periodic_evaluation()
             if self.early_stopping.stopped:
@@ -286,6 +291,7 @@ class PeriodicTrainingCallback(BaseCallback):
                 f"mean_reward={mean_reward:.3f}, std_reward={std_reward:.3f}, "
                 f"mean_length={mean_length:.1f}."
             )
+        self._print_action_usage()
 
         improved = self.early_stopping.register(mean_reward)
         self.best_mean_reward = self.early_stopping.best_mean_reward
@@ -332,3 +338,46 @@ class PeriodicTrainingCallback(BaseCallback):
         save_checkpoint_bundle(self.model, checkpoint_stem, metadata)
         if self.verbose:
             print(f"Checkpoint guardado en {checkpoint_stem.with_suffix('.zip')}")
+        self._print_action_usage()
+
+    def _load_action_labels(self) -> tuple[str, ...]:
+        if self.profile.action_space_kind != "button_combinations":
+            return ()
+
+        labels_by_env = self.training_env.get_attr("action_labels")
+        if not labels_by_env:
+            return ()
+
+        labels = labels_by_env[0]
+        if not isinstance(labels, tuple):
+            return ()
+        return tuple(str(label) for label in labels)
+
+    def _record_actions(self) -> None:
+        if self.profile.action_space_kind != "button_combinations":
+            return
+
+        actions = self.locals.get("actions")
+        if actions is None:
+            return
+
+        for action_index in np.asarray(actions).reshape(-1):
+            self.action_counts[int(action_index)] += 1
+
+    def _print_action_usage(self) -> None:
+        if not self.verbose or not self.action_counts:
+            return
+
+        total = sum(self.action_counts.values())
+        top_actions = []
+        for action_index, count in self.action_counts.most_common(5):
+            label = (
+                self.action_labels[action_index]
+                if 0 <= action_index < len(self.action_labels)
+                else str(action_index)
+            )
+            percentage = (count / total) * 100
+            top_actions.append(f"{label}={count} ({percentage:.1f}%)")
+
+        print("Acciones recientes: " + ", ".join(top_actions))
+        self.action_counts.clear()

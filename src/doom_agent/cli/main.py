@@ -223,6 +223,7 @@ def main() -> None:
             eval_frequency=args.eval_freq,
             eval_episodes=args.eval_episodes,
             save_best=not args.no_save_best,
+            allow_scenario_resume=args.allow_scenario_resume,
         )
         return
 

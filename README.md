@@ -6,12 +6,14 @@ Proyecto de aprendizaje por refuerzo para entrenar y evaluar un agente en escena
 
 - La logica ahora esta separada por responsabilidades en `config`, `envs`, `models`, `services`, `utils` y `shared`.
 - Los perfiles y escenarios viven fuera del codigo en `configs/training_profiles.toml`.
-- El espacio de acciones ahora soporta combinaciones de botones y `no-op` mediante `MultiDiscrete`, en vez de limitar al agente a una sola tecla por paso.
+- El espacio de acciones por defecto usa combinaciones discretas curadas, evitando combinaciones contradictorias como izquierda+derecha.
+- Los escenarios usan presets focalizados de 3 acciones utiles: combate lateral, combate con giros o navegacion hacia adelante segun botones disponibles.
 - El reward shaping es configurable por escenario sin modificar el wrapper del entorno.
 - Cada perfil puede fijar una `seed` reproducible y tambien sobrescribirse por CLI.
 - Cada checkpoint nuevo guarda un archivo `.json` con la configuracion usada para entrenarlo.
 - El entrenamiento reanuda automaticamente desde el ultimo checkpoint compatible, salvo que uses `--from-scratch`.
 - Cada corrida puede evaluar periodicamente y guardar `best_model` aparte del ultimo estado.
+- En perfiles de curriculum, cada etapa siguiente reanuda desde el `best_model` de la etapa anterior cuando existe.
 - El entrenamiento ahora soporta `early stopping` por evaluaciones sin mejora.
 - El proyecto soporta perfiles de `curriculum training` con multiples etapas por escenario.
 - Existe un runner secuencial de sweeps para comparar combinaciones de hiperparametros.
@@ -79,7 +81,7 @@ Listar corridas registradas:
 Inspeccionar metadata de un checkpoint:
 
 ```powershell
-.\.venv\Scripts\python.exe src\cli.py inspect-checkpoint --checkpoint ppo_doom_recurrent_fast --select best
+.\.venv\Scripts\python.exe src\cli.py inspect-checkpoint --checkpoint ppo_doom_recurrent_fast_actions_v2 --select best
 ```
 
 Ejecutar un sweep secuencial:
@@ -114,6 +116,12 @@ Entrenar un perfil con curriculum:
 .\.venv\Scripts\python.exe src\train.py --config curriculum_fast
 ```
 
+Entrenar un curriculum unico por todos los escenarios:
+
+```powershell
+.\.venv\Scripts\python.exe src\train.py --config all_scenarios --resume artifacts\checkpoints\ppo_doom_recurrent_actions_v2_best.zip
+```
+
 Sobrescribir la `seed` del perfil:
 
 ```powershell
@@ -129,7 +137,7 @@ Forzar una corrida desde cero:
 Reanudar desde un checkpoint explicito:
 
 ```powershell
-.\.venv\Scripts\python.exe src\train.py --config fast --resume artifacts\checkpoints\ppo_doom_recurrent_fast.zip
+.\.venv\Scripts\python.exe src\train.py --config fast --resume artifacts\checkpoints\ppo_doom_recurrent_fast_actions_v2.zip
 ```
 
 Activar evaluacion periodica mas frecuente:
@@ -184,7 +192,7 @@ Por defecto, si existe, la evaluacion intentara usar `<checkpoint>_best.zip`.
 Evaluar otro checkpoint:
 
 ```powershell
-.\.venv\Scripts\python.exe src\evaluate.py --checkpoint ppo_doom_recurrent_fast --steps 500
+.\.venv\Scripts\python.exe src\evaluate.py --checkpoint ppo_doom_recurrent_fast_actions_v2 --steps 500
 ```
 
 Forzar el ultimo estado entrenado en lugar del mejor:
@@ -196,13 +204,13 @@ Forzar el ultimo estado entrenado en lugar del mejor:
 Tambien puedes pasar una ruta directa:
 
 ```powershell
-.\.venv\Scripts\python.exe src\evaluate.py --checkpoint artifacts\checkpoints\ppo_doom_recurrent_fast.zip
+.\.venv\Scripts\python.exe src\evaluate.py --checkpoint artifacts\checkpoints\ppo_doom_recurrent_fast_actions_v2.zip
 ```
 
 Evaluar un checkpoint pero forzando otro escenario:
 
 ```powershell
-.\.venv\Scripts\python.exe src\evaluate.py --checkpoint ppo_doom_recurrent_fast --scenario defend_the_center
+.\.venv\Scripts\python.exe src\evaluate.py --checkpoint ppo_doom_recurrent_fast_actions_v2 --scenario defend_the_center
 ```
 
 La evaluacion intenta usar la metadata del checkpoint para reconstruir el escenario y la configuracion correcta. Si el checkpoint es legado y no tiene metadata, usa el escenario del perfil `default` y trata de inferir el tipo de espacio de acciones.

@@ -49,6 +49,14 @@ class TrainingExecutionResult:
     stop_reason: str | None
 
 
+def select_curriculum_resume_path(result: TrainingExecutionResult) -> Path:
+    final_checkpoint_stem = result.final_checkpoint_path.with_suffix("")
+    best_checkpoint_path = checkpoint_zip_path(best_checkpoint_stem(final_checkpoint_stem))
+    if best_checkpoint_path.exists():
+        return best_checkpoint_path
+    return result.final_checkpoint_path
+
+
 def print_training_summary(
     profile_name: str,
     profile: TrainingProfile,
@@ -287,6 +295,7 @@ def train(
     eval_frequency: int | None = None,
     eval_episodes: int = 5,
     save_best: bool = True,
+    allow_scenario_resume: bool = False,
 ) -> TrainingExecutionResult:
     profile = get_training_profile(
         profile_name,
@@ -323,7 +332,7 @@ def train(
             )
             if last_result.training_status in {"keyboard_interrupt", "vizdoom_exit"}:
                 break
-            stage_resume_mode = str(last_result.final_checkpoint_path)
+            stage_resume_mode = str(select_curriculum_resume_path(last_result))
             stage_from_scratch = False
 
         if last_result is None:
@@ -338,4 +347,5 @@ def train(
         eval_frequency=eval_frequency,
         eval_episodes=eval_episodes,
         save_best=save_best,
+        allow_scenario_resume=allow_scenario_resume,
     )

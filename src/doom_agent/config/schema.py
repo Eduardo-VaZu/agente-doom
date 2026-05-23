@@ -152,6 +152,7 @@ class TrainingProfile:
     screen_height: int = 84
     seed: int = 42
     action_space_kind: str = "multidiscrete"
+    action_combo_preset: str = "default"
     scenario_key: str = "basic"
     scenario_description: str = ""
     reward_shaping: RewardShapingConfig = field(default_factory=RewardShapingConfig)
@@ -218,8 +219,21 @@ class TrainingProfile:
         if not 0 < self.gae_lambda <= 1:
             raise ValueError("'gae_lambda' debe estar entre 0 y 1.")
 
-        if self.action_space_kind not in {"discrete", "multidiscrete"}:
-            raise ValueError("'action_space_kind' debe ser 'discrete' o 'multidiscrete'.")
+        if self.action_space_kind not in {"button_combinations", "discrete", "multidiscrete"}:
+            raise ValueError(
+                "'action_space_kind' debe ser 'button_combinations', 'discrete' o 'multidiscrete'."
+            )
+
+        if self.action_combo_preset not in {
+            "basic_combat",
+            "default",
+            "health_navigation",
+            "turn_combat",
+        }:
+            raise ValueError(
+                "'action_combo_preset' debe ser 'basic_combat', 'default', "
+                "'health_navigation' o 'turn_combat'."
+            )
 
         if not self.scenario_key:
             raise ValueError("'scenario_key' no puede estar vacio.")
@@ -256,6 +270,7 @@ class TrainingProfile:
             "screen_height": self.screen_height,
             "seed": self.seed,
             "action_space_kind": self.action_space_kind,
+            "action_combo_preset": self.action_combo_preset,
             "scenario_key": self.scenario_key,
             "scenario_description": self.scenario_description,
             "reward_shaping": self.reward_shaping.to_dict(),
@@ -281,6 +296,7 @@ class TrainingProfile:
             "screen_height": self.screen_height,
             "seed": self.seed,
             "action_space_kind": self.action_space_kind,
+            "action_combo_preset": self.action_combo_preset,
             "reward_shaping": self.reward_shaping.to_dict(),
         }
 
@@ -344,6 +360,7 @@ class TrainingProfile:
             screen_height=payload.get("screen_height", 84),
             seed=payload.get("seed", 42),
             action_space_kind=payload.get("action_space_kind", "multidiscrete"),
+            action_combo_preset=payload.get("action_combo_preset", "default"),
             scenario_key=payload.get("scenario_key", "basic"),
             scenario_description=payload.get("scenario_description", ""),
             reward_shaping=RewardShapingConfig.from_dict(payload.get("reward_shaping")),

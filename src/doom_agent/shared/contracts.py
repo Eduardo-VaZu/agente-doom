@@ -44,6 +44,7 @@ class TrainingProfilePayload(TypedDict, total=False):
     screen_height: int
     seed: int
     action_space_kind: str
+    action_combo_preset: str
     scenario_key: str
     scenario_description: str
     reward_shaping: RewardShapingPayload
@@ -142,6 +143,7 @@ class LegacyConfigPayload(TypedDict, total=False):
     seed: int
     scenario_key: str
     scenario_description: str
+    action_combo_preset: str
     reward_shaping: RewardShapingPayload
     early_stopping: EarlyStoppingPayload
     curriculum: list[CurriculumStagePayload]
