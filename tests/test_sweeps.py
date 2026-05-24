@@ -26,3 +26,15 @@ class SweepTests(unittest.TestCase):
         self.assertTrue(specs[-1].profile.checkpoint_name.endswith("__sweep_004"))
         self.assertEqual(specs[1].profile.learning_rate, 0.0001)
         self.assertEqual(specs[2].profile.learning_rate, 0.0002)
+
+    def test_build_sweep_run_specs_fails_fast_on_invalid_batch_size(self) -> None:
+        profile = get_training_profile("fast")
+        with self.assertRaises(ValueError) as context:
+            build_sweep_run_specs(
+                profile,
+                learning_rates=(0.0001,),
+                n_steps_values=(128,),
+                batch_sizes=(256,),  # 256 > 128 (inválido)
+                seeds=(42,),
+            )
+        self.assertIn("no puede ser mayor que 'n_steps'", str(context.exception))

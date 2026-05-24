@@ -36,6 +36,12 @@ def build_sweep_run_specs(
     total = len(combinations)
 
     for index, (learning_rate, n_steps, batch_size, seed) in enumerate(combinations, start=1):
+        if batch_size > n_steps:
+            raise ValueError(
+                f"La combinación de sweep #{index} es inválida: "
+                f"'batch_size' ({batch_size}) no puede ser mayor que 'n_steps' ({n_steps})."
+            )
+
         suffix = _name_suffix(index)
         profile = replace(
             base_profile,
