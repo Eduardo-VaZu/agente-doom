@@ -109,6 +109,32 @@ class EnvironmentSmokeTests(unittest.TestCase):
         )
         self.assertTrue(all("ATTACK" in label for label in labels))
 
+    def test_basic_combat_efficient_actions_include_move_and_attack_actions(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("MOVE_LEFT", "MOVE_RIGHT", "ATTACK"),
+            preset="basic_combat_efficient",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 5)
+        self.assertEqual(
+            readable_labels,
+            ("MOVE_LEFT", "MOVE_RIGHT", "ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+        )
+
+    def test_turn_combat_efficient_actions_include_turn_and_attack_actions(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("TURN_LEFT", "TURN_RIGHT", "ATTACK"),
+            preset="turn_combat_efficient",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 5)
+        self.assertEqual(
+            readable_labels,
+            ("TURN_LEFT", "TURN_RIGHT", "ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
+        )
+
     def test_health_navigation_actions_keep_moving_forward(self) -> None:
         labels, actions = build_button_combination_actions(
             ("TURN_LEFT", "TURN_RIGHT", "MOVE_FORWARD"),
@@ -127,9 +153,24 @@ class EnvironmentSmokeTests(unittest.TestCase):
         project_paths = build_project_paths()
 
         scenario_expectations = {
-            "basic": ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
-            "deadly_corridor": ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
-            "defend_the_center": ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
+            "basic": ("MOVE_LEFT", "MOVE_RIGHT", "ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+            "deadly_corridor": (
+                "NOOP",
+                "MOVE_LEFT",
+                "MOVE_RIGHT",
+                "ATTACK",
+                "MOVE_FORWARD",
+                "MOVE_BACKWARD",
+                "TURN_LEFT",
+                "TURN_RIGHT",
+                "MOVE_LEFT+ATTACK",
+                "MOVE_RIGHT+ATTACK",
+                "MOVE_FORWARD+ATTACK",
+                "MOVE_BACKWARD+ATTACK",
+                "TURN_LEFT+ATTACK",
+                "TURN_RIGHT+ATTACK",
+            ),
+            "defend_the_center": ("TURN_LEFT", "TURN_RIGHT", "ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
             "health_gathering": (
                 "MOVE_FORWARD",
                 "TURN_LEFT+MOVE_FORWARD",

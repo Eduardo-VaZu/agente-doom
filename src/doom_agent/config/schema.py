@@ -226,13 +226,15 @@ class TrainingProfile:
 
         if self.action_combo_preset not in {
             "basic_combat",
+            "basic_combat_efficient",
             "default",
             "health_navigation",
             "turn_combat",
+            "turn_combat_efficient",
         }:
             raise ValueError(
-                "'action_combo_preset' debe ser 'basic_combat', 'default', "
-                "'health_navigation' o 'turn_combat'."
+                "'action_combo_preset' debe ser 'basic_combat', 'basic_combat_efficient', "
+                "'default', 'health_navigation', 'turn_combat' o 'turn_combat_efficient'."
             )
 
         if not self.scenario_key:

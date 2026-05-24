@@ -92,7 +92,23 @@ def build_button_combination_actions(
         add_action(("MOVE_RIGHT", "ATTACK"))
         return tuple(labels), tuple(actions)
 
+    if preset == "basic_combat_efficient":
+        add_action(("MOVE_LEFT",))
+        add_action(("MOVE_RIGHT",))
+        add_action(("ATTACK",))
+        add_action(("MOVE_LEFT", "ATTACK"))
+        add_action(("MOVE_RIGHT", "ATTACK"))
+        return tuple(labels), tuple(actions)
+
     if preset == "turn_combat":
+        add_action(("ATTACK",))
+        add_action(("TURN_LEFT", "ATTACK"))
+        add_action(("TURN_RIGHT", "ATTACK"))
+        return tuple(labels), tuple(actions)
+
+    if preset == "turn_combat_efficient":
+        add_action(("TURN_LEFT",))
+        add_action(("TURN_RIGHT",))
         add_action(("ATTACK",))
         add_action(("TURN_LEFT", "ATTACK"))
         add_action(("TURN_RIGHT", "ATTACK"))

@@ -125,12 +125,12 @@ scenario_key = "health_gathering"
 [scenarios.basic]
 scenario_name = "basic.cfg"
 description = "Escenario base para validar el pipeline completo."
-action_combo_preset = "basic_combat"
+action_combo_preset = "basic_combat_efficient"
 
 [scenarios.defend_the_center]
 scenario_name = "defend_the_center.cfg"
 description = "Escenario reactivo centrado en punteria y giros rapidos."
-action_combo_preset = "turn_combat"
+action_combo_preset = "turn_combat_efficient"
 requested_timesteps = 250000
 checkpoint_frequency = 25000
 video_record_frequency = 25000
@@ -144,7 +144,7 @@ clip_max = 1.0
 [scenarios.deadly_corridor]
 scenario_name = "deadly_corridor.cfg"
 description = "Escenario mas complejo con navegacion, combate y recompensas esparsas."
-action_combo_preset = "basic_combat"
+action_combo_preset = "default"
 requested_timesteps = 300000
 checkpoint_frequency = 20000
 video_record_frequency = 20000
