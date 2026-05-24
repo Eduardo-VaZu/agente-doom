@@ -21,6 +21,7 @@ screen_height = 84
 seed = 42
 action_space_kind = "button_combinations"
 action_combo_preset = "default"
+doom_skill = 3
 
 [defaults.reward_shaping]
 scale = 1.0
@@ -91,6 +92,34 @@ requested_timesteps = 2048
 [[profiles.curriculum_fast.curriculum]]
 scenario_key = "health_gathering"
 requested_timesteps = 2048
+
+[profiles.curriculum_corridor]
+scenario_key = "deadly_corridor"
+n_steps = 256
+n_epochs = 3
+requested_timesteps = 100000
+render = false
+record_video = false
+checkpoint_name = "ppo_doom_recurrent_curriculum_corridor"
+tensorboard_run_name = "PPO_LSTM_Doom_Curriculum_Corridor"
+checkpoint_frequency = 10000
+video_record_frequency = 10000
+video_length = 2000
+
+[[profiles.curriculum_corridor.curriculum]]
+scenario_key = "deadly_corridor"
+doom_skill = 1
+requested_timesteps = 100000
+
+[[profiles.curriculum_corridor.curriculum]]
+scenario_key = "deadly_corridor"
+doom_skill = 2
+requested_timesteps = 100000
+
+[[profiles.curriculum_corridor.curriculum]]
+scenario_key = "deadly_corridor"
+doom_skill = 3
+requested_timesteps = 150000
 
 [profiles.all_scenarios]
 scenario_key = "basic"

@@ -33,23 +33,23 @@ class TrainingProfileTests(unittest.TestCase):
         profile = get_training_profile("fast", scenario_name="deadly_corridor")
         self.assertEqual(profile.scenario_key, "deadly_corridor")
         self.assertEqual(profile.scenario_name, "deadly_corridor.cfg")
-        self.assertEqual(profile.action_combo_preset, "basic_combat")
+        self.assertEqual(profile.action_combo_preset, "default")
         self.assertIn("__deadly_corridor", profile.checkpoint_name)
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)
         self.assertEqual(profile.reward_shaping.clip_max, 1.0)
 
     def test_basic_scenario_uses_combat_action_preset(self) -> None:
         profile = get_training_profile("fast")
-        self.assertEqual(profile.action_combo_preset, "basic_combat")
+        self.assertEqual(profile.action_combo_preset, "basic_combat_efficient")
 
     def test_scenarios_use_focused_action_presets(self) -> None:
         self.assertEqual(
             get_training_profile("fast", scenario_name="deadly_corridor").action_combo_preset,
-            "basic_combat",
+            "default",
         )
         self.assertEqual(
             get_training_profile("fast", scenario_name="defend_the_center").action_combo_preset,
-            "turn_combat",
+            "turn_combat_efficient",
         )
         self.assertEqual(
             get_training_profile("fast", scenario_name="health_gathering").action_combo_preset,
@@ -97,3 +97,30 @@ class TrainingProfileTests(unittest.TestCase):
         for scenario_name in SCENARIO_NAMES:
             with self.subTest(scenario=scenario_name):
                 get_training_profile("fast", scenario_name=scenario_name).validate(project_paths)
+
+    def test_profile_supports_doom_skill_default_and_override(self) -> None:
+        default_profile = get_training_profile("fast")
+        self.assertEqual(default_profile.doom_skill, 3)
+
+        custom_profile = get_training_profile("fast", scenario_name="deadly_corridor")
+        # Por defecto hereda el valor del perfil
+        self.assertEqual(custom_profile.doom_skill, 3)
+
+    def test_curriculum_corridor_doom_skill_progressive_materialization(self) -> None:
+        stages = materialize_curriculum_profiles("curriculum_corridor", seed=300)
+        self.assertEqual(len(stages), 3)
+        self.assertEqual([stage.scenario_key for stage in stages], ["deadly_corridor", "deadly_corridor", "deadly_corridor"])
+        self.assertEqual([stage.doom_skill for stage in stages], [1, 2, 3])
+        self.assertEqual(stages[0].requested_timesteps, 100000)
+        self.assertEqual(stages[1].requested_timesteps, 100000)
+        self.assertEqual(stages[2].requested_timesteps, 150000)
+
+    def test_profile_invalid_doom_skill_throws_validation_error(self) -> None:
+        from dataclasses import replace
+        profile = get_training_profile("fast")
+        
+        with self.assertRaises(ValueError):
+            replace(profile, doom_skill=0).validate(build_project_paths())
+
+        with self.assertRaises(ValueError):
+            replace(profile, doom_skill=6).validate(build_project_paths())

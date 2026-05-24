@@ -108,17 +108,21 @@ class EarlyStoppingConfig:
 class CurriculumStageConfig:
     scenario_key: str
     requested_timesteps: int | None = None
+    doom_skill: int | None = None
 
     def validate(self) -> None:
         if not self.scenario_key:
             raise ValueError("'curriculum.scenario_key' no puede estar vacio.")
         if self.requested_timesteps is not None and self.requested_timesteps <= 0:
             raise ValueError("'curriculum.requested_timesteps' debe ser mayor que cero.")
+        if self.doom_skill is not None and not 1 <= self.doom_skill <= 5:
+            raise ValueError("'curriculum.doom_skill' debe estar entre 1 y 5.")
 
     def to_dict(self) -> CurriculumStagePayload:
         return {
             "scenario_key": self.scenario_key,
             "requested_timesteps": self.requested_timesteps,
+            "doom_skill": self.doom_skill,
         }
 
     @classmethod
@@ -126,6 +130,7 @@ class CurriculumStageConfig:
         return cls(
             scenario_key=payload["scenario_key"],
             requested_timesteps=payload.get("requested_timesteps"),
+            doom_skill=payload.get("doom_skill"),
         )
 
 
@@ -151,6 +156,7 @@ class TrainingProfile:
     screen_width: int = 84
     screen_height: int = 84
     seed: int = 42
+    doom_skill: int = 3
     action_space_kind: str = "multidiscrete"
     action_combo_preset: str = "default"
     scenario_key: str = "basic"
@@ -172,6 +178,9 @@ class TrainingProfile:
 
     def with_seed(self, seed: int) -> TrainingProfile:
         return replace(self, seed=seed)
+
+    def with_doom_skill(self, doom_skill: int) -> TrainingProfile:
+        return replace(self, doom_skill=doom_skill)
 
     def with_names(self, checkpoint_name: str, tensorboard_run_name: str) -> TrainingProfile:
         return replace(
@@ -240,6 +249,9 @@ class TrainingProfile:
         if not self.scenario_key:
             raise ValueError("'scenario_key' no puede estar vacio.")
 
+        if not 1 <= self.doom_skill <= 5:
+            raise ValueError("'doom_skill' debe estar entre 1 y 5 (inclusive).")
+
         self.reward_shaping.validate()
         self.early_stopping.validate()
         for stage in self.curriculum:
@@ -271,6 +283,7 @@ class TrainingProfile:
             "screen_width": self.screen_width,
             "screen_height": self.screen_height,
             "seed": self.seed,
+            "doom_skill": self.doom_skill,
             "action_space_kind": self.action_space_kind,
             "action_combo_preset": self.action_combo_preset,
             "scenario_key": self.scenario_key,
@@ -297,6 +310,7 @@ class TrainingProfile:
             "screen_width": self.screen_width,
             "screen_height": self.screen_height,
             "seed": self.seed,
+            "doom_skill": self.doom_skill,
             "action_space_kind": self.action_space_kind,
             "action_combo_preset": self.action_combo_preset,
             "reward_shaping": self.reward_shaping.to_dict(),
@@ -361,6 +375,7 @@ class TrainingProfile:
             screen_width=payload.get("screen_width", 84),
             screen_height=payload.get("screen_height", 84),
             seed=payload.get("seed", 42),
+            doom_skill=payload.get("doom_skill", 3),
             action_space_kind=payload.get("action_space_kind", "multidiscrete"),
             action_combo_preset=payload.get("action_combo_preset", "default"),
             scenario_key=payload.get("scenario_key", "basic"),

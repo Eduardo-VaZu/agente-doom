@@ -20,6 +20,7 @@ class EarlyStoppingPayload(TypedDict, total=False):
 class CurriculumStagePayload(TypedDict, total=False):
     scenario_key: str
     requested_timesteps: int | None
+    doom_skill: int | None
 
 
 class TrainingProfilePayload(TypedDict, total=False):
@@ -43,6 +44,7 @@ class TrainingProfilePayload(TypedDict, total=False):
     screen_width: int
     screen_height: int
     seed: int
+    doom_skill: int
     action_space_kind: str
     action_combo_preset: str
     scenario_key: str

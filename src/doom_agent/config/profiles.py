@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
-from doom_agent.config.schema import ProjectPaths, TrainingProfile
+from doom_agent.config.schema import ProjectPaths, TrainingProfile, CurriculumStageConfig
 from doom_agent.shared.contracts import (
     CatalogSection,
     ProfileOverrides,
@@ -217,6 +217,8 @@ def materialize_curriculum_profiles(
         if stage.requested_timesteps is not None:
             stage_profile = stage_profile.with_timesteps(stage.requested_timesteps)
         stage_profile = stage_profile.with_seed(base_profile.seed + stage_index)
+        if stage.doom_skill is not None:
+            stage_profile = stage_profile.with_doom_skill(stage.doom_skill)
         stages.append(stage_profile)
     return stages
 

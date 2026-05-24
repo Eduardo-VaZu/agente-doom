@@ -264,6 +264,7 @@ def build_doom_game(profile: TrainingProfile, project_paths: ProjectPaths) -> zd
     game.set_window_visible(profile.render)
     game.set_screen_format(zd.ScreenFormat.RGB24)
     game.set_screen_resolution(zd.ScreenResolution.RES_320X240)
+    game.set_doom_skill(profile.doom_skill)
     game.init()
     return game
 
