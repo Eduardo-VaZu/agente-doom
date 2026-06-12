@@ -1,4 +1,8 @@
-"""Backward-compatible config exports."""
+"""Backward-compatible config exports.
+
+Public flow keeps only ``CONFIG`` as normal training preset.
+Additional presets remain available only for legacy/internal compatibility.
+"""
 
 from doom_agent.config import SCENARIO_NAMES, TRAINING_PROFILES, build_project_paths
 from doom_agent.config.schema import TrainingProfile
@@ -44,14 +48,12 @@ def _profile_to_legacy_config(profile: TrainingProfile) -> LegacyConfigPayload:
 
 
 CONFIG = _profile_to_legacy_config(TRAINING_PROFILES["default"])
-FAST_CONFIG = _profile_to_legacy_config(TRAINING_PROFILES["fast"])
-EFFICIENT_CONFIG = _profile_to_legacy_config(TRAINING_PROFILES["efficient"])
 
 TRAINING_CONFIGS: dict[str, LegacyConfigPayload] = {
     "default": CONFIG,
-    "fast": FAST_CONFIG,
-    "efficient": EFFICIENT_CONFIG,
 }
+
+INTERNAL_TRAINING_CONFIGS: dict[str, LegacyConfigPayload] = {}
 
 __all__ = [
     "BASE_DIR",
@@ -60,7 +62,6 @@ __all__ = [
     "VIDEO_DIR",
     "SCENARIO_NAMES",
     "CONFIG",
-    "FAST_CONFIG",
-    "EFFICIENT_CONFIG",
+    "INTERNAL_TRAINING_CONFIGS",
     "TRAINING_CONFIGS",
 ]

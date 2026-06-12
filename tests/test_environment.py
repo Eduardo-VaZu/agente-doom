@@ -19,7 +19,7 @@ from doom_agent.envs.doom_env import build_button_combination_actions, has_oppos
 class EnvironmentSmokeTests(unittest.TestCase):
     def test_environment_reset_and_step_supports_button_combinations(self) -> None:
         project_paths = build_project_paths()
-        profile = get_training_profile("fast")
+        profile = get_training_profile("default")
         env = make_vectorized_env(profile, project_paths)
 
         try:
@@ -52,7 +52,7 @@ class EnvironmentSmokeTests(unittest.TestCase):
 
     def test_environment_still_supports_legacy_multidiscrete_actions(self) -> None:
         project_paths = build_project_paths()
-        profile = replace(get_training_profile("fast"), action_space_kind="multidiscrete")
+        profile = replace(get_training_profile("default"), action_space_kind="multidiscrete")
         env = make_vectorized_env(profile, project_paths)
 
         try:
@@ -139,7 +139,7 @@ class EnvironmentSmokeTests(unittest.TestCase):
 
         for scenario_name, expected_labels in scenario_expectations.items():
             with self.subTest(scenario=scenario_name):
-                profile = get_training_profile("fast", scenario_name=scenario_name)
+                profile = get_training_profile("default", scenario_name=scenario_name)
                 env = make_vectorized_env(profile, project_paths)
                 try:
                     self.assertEqual(env.get_attr("action_labels")[0], expected_labels)

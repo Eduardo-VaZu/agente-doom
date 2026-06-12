@@ -17,10 +17,8 @@ from doom_agent.shared.contracts import (
     TrainingProfilePayload,
     TrainingRunReportPayload,
 )
-from doom_agent.shared.types import BinaryAction, Observation, PathLike
 
 __all__ = [
-    "BinaryAction",
     "CatalogSection",
     "CheckpointSelection",
     "CheckpointMetadataPayload",
@@ -30,8 +28,6 @@ __all__ = [
     "ExperimentIndexPayload",
     "EvaluationMetricsPayload",
     "LegacyConfigPayload",
-    "Observation",
-    "PathLike",
     "ProfileOverrides",
     "RewardShapingPayload",
     "SaveableModel",

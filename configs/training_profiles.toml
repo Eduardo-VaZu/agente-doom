@@ -1,26 +1,14 @@
 [defaults]
 scenario_key = "basic"
-learning_rate = 0.0001
-n_steps = 2048
-batch_size = 64
-n_epochs = 10
-gamma = 0.99
-gae_lambda = 0.95
-ent_coef = 0.01
-requested_timesteps = 500000
 render = true
 record_video = true
 checkpoint_name = "ppo_doom_recurrent_actions_v2"
 tensorboard_run_name = "PPO_LSTM_Doom_Actions_V2"
-checkpoint_frequency = 50000
-video_record_frequency = 100000
-video_length = 2000
 frame_stack = 4
 screen_width = 84
 screen_height = 84
 seed = 42
 action_space_kind = "button_combinations"
-action_combo_preset = "default"
 
 [defaults.reward_shaping]
 scale = 1.0
@@ -35,105 +23,37 @@ min_delta = 0.0
 [profiles.default]
 scenario_key = "basic"
 
-[profiles.fast]
-scenario_key = "basic"
-n_steps = 256
-n_epochs = 3
-requested_timesteps = 10000
-render = false
-record_video = false
-checkpoint_name = "ppo_doom_recurrent_fast_actions_v2"
-tensorboard_run_name = "PPO_LSTM_Doom_Fast_Actions_V2"
-checkpoint_frequency = 2000
-video_record_frequency = 2000
-video_length = 1000
-
-[profiles.efficient]
-scenario_key = "basic"
-n_steps = 1024
-n_epochs = 5
-requested_timesteps = 100000
-render = false
-record_video = false
-checkpoint_name = "ppo_doom_recurrent_efficient_actions_v2"
-tensorboard_run_name = "PPO_LSTM_Doom_Efficient_Actions_V2"
-checkpoint_frequency = 10000
-video_record_frequency = 10000
-video_length = 1500
-
-[profiles.curriculum_fast]
-scenario_key = "basic"
-n_steps = 256
-n_epochs = 3
-requested_timesteps = 2048
-render = false
-record_video = false
-checkpoint_name = "ppo_doom_recurrent_curriculum_fast_actions_v2"
-tensorboard_run_name = "PPO_LSTM_Doom_Curriculum_Fast_Actions_V2"
-checkpoint_frequency = 1024
-video_record_frequency = 1024
-video_length = 750
-
-[profiles.curriculum_fast.early_stopping]
-enabled = true
-patience_evaluations = 2
-min_evaluations = 2
-min_delta = 0.0
-
-[[profiles.curriculum_fast.curriculum]]
-scenario_key = "basic"
-requested_timesteps = 2048
-
-[[profiles.curriculum_fast.curriculum]]
-scenario_key = "defend_the_center"
-requested_timesteps = 2048
-
-[[profiles.curriculum_fast.curriculum]]
-scenario_key = "health_gathering"
-requested_timesteps = 2048
-
-[profiles.all_scenarios]
-scenario_key = "basic"
-requested_timesteps = 50000
-render = true
-record_video = true
-checkpoint_name = "ppo_doom_recurrent_all_scenarios_actions_v2"
-tensorboard_run_name = "PPO_LSTM_Doom_All_Scenarios_Actions_V2"
-checkpoint_frequency = 25000
-video_record_frequency = 50000
-video_length = 2000
-
-[profiles.all_scenarios.early_stopping]
-enabled = true
-patience_evaluations = 2
-min_evaluations = 2
-min_delta = 1.0
-
-[[profiles.all_scenarios.curriculum]]
-scenario_key = "basic"
-requested_timesteps = 50000
-
-[[profiles.all_scenarios.curriculum]]
-scenario_key = "defend_the_center"
-
-[[profiles.all_scenarios.curriculum]]
-scenario_key = "deadly_corridor"
-
-[[profiles.all_scenarios.curriculum]]
-scenario_key = "health_gathering"
-
 [scenarios.basic]
 scenario_name = "basic.cfg"
 description = "Escenario base para validar el pipeline completo."
+learning_rate = 0.0001
+n_steps = 2048
+batch_size = 64
+n_epochs = 10
+gamma = 0.99
+gae_lambda = 0.95
+ent_coef = 0.01
+requested_timesteps = 500000
+checkpoint_frequency = 50000
+video_record_frequency = 100000
+video_length = 2000
 action_combo_preset = "basic_combat"
 
 [scenarios.defend_the_center]
 scenario_name = "defend_the_center.cfg"
 description = "Escenario reactivo centrado en punteria y giros rapidos."
-action_combo_preset = "turn_combat"
+learning_rate = 0.0001
+n_steps = 2048
+batch_size = 64
+n_epochs = 10
+gamma = 0.99
+gae_lambda = 0.95
+ent_coef = 0.01
 requested_timesteps = 250000
 checkpoint_frequency = 25000
 video_record_frequency = 25000
+video_length = 2000
+action_combo_preset = "turn_combat"
 
 [scenarios.defend_the_center.reward_shaping]
 scale = 1.0
@@ -144,11 +64,18 @@ clip_max = 1.0
 [scenarios.deadly_corridor]
 scenario_name = "deadly_corridor.cfg"
 description = "Escenario mas complejo con navegacion, combate y recompensas esparsas."
-action_combo_preset = "basic_combat"
+learning_rate = 0.0001
+n_steps = 2048
+batch_size = 64
+n_epochs = 10
+gamma = 0.99
+gae_lambda = 0.95
+ent_coef = 0.01
 requested_timesteps = 300000
 checkpoint_frequency = 20000
 video_record_frequency = 20000
 video_length = 2500
+action_combo_preset = "basic_combat"
 
 [scenarios.deadly_corridor.reward_shaping]
 scale = 0.1
@@ -159,10 +86,18 @@ clip_max = 1.0
 [scenarios.health_gathering]
 scenario_name = "health_gathering.cfg"
 description = "Escenario de supervivencia con recompensa densa por mantenerse con vida."
-action_combo_preset = "health_navigation"
+learning_rate = 0.0001
+n_steps = 2048
+batch_size = 64
+n_epochs = 10
+gamma = 0.99
+gae_lambda = 0.95
+ent_coef = 0.01
 requested_timesteps = 150000
 checkpoint_frequency = 15000
 video_record_frequency = 15000
+video_length = 2000
+action_combo_preset = "health_navigation"
 
 [scenarios.health_gathering.reward_shaping]
 scale = 0.05

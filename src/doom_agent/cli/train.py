@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import argparse
 
-from doom_agent.config import PROFILE_NAMES, SCENARIO_NAMES
-from doom_agent.services.trainer import train
-from doom_agent.services.training_support import AUTO_RESUME_MODE, LATEST_RESUME_MODE
+from doom_agent.config import DEFAULT_PROFILE_NAME, PROFILE_NAMES, SCENARIO_NAMES
+
+AUTO_RESUME_MODE = "auto"
+LATEST_RESUME_MODE = "latest"
 
 
 def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         choices=PROFILE_NAMES,
-        default="default",
-        help="Perfil de entrenamiento a usar.",
+        default=DEFAULT_PROFILE_NAME,
+        help=(
+            "Configuracion base a usar. Flujo normal: omitir esta bandera y elegir solo '--scenario'."
+        ),
     )
     parser.add_argument(
         "--timesteps",
@@ -24,13 +27,13 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         "--scenario",
         choices=SCENARIO_NAMES,
         default=None,
-        help="Escenario a usar sin editar archivos de codigo.",
+        help="Escenario del entrenamiento normal. Si se omite, usa el preset por defecto ('basic').",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=None,
-        help="Sobrescribe la seed del perfil para esta ejecucion.",
+        help="Sobrescribe la seed base para esta ejecucion.",
     )
     parser.add_argument(
         "--resume",
@@ -74,11 +77,20 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
 
 
 def parse_args() -> argparse.Namespace:
-    parser = add_train_arguments(argparse.ArgumentParser(description="Entrena el agente ViZDoom."))
+    parser = add_train_arguments(
+        argparse.ArgumentParser(
+            description=(
+                "Entrenamiento normal por escenario para Agente Doom. "
+                "Usa 'train --scenario <escenario>' como flujo recomendado."
+            )
+        )
+    )
     return parser.parse_args()
 
 
 def main() -> None:
+    from doom_agent.services.trainer import train
+
     args = parse_args()
     if args.from_scratch and args.resume not in {AUTO_RESUME_MODE, LATEST_RESUME_MODE}:
         raise SystemExit(

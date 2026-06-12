@@ -16,6 +16,7 @@ from doom_agent.shared.contracts import (
 
 DEFAULT_PROFILE_NAME = "default"
 DEFAULT_SCENARIO_NAME = "basic"
+PUBLIC_PROFILE_NAMES = (DEFAULT_PROFILE_NAME,)
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +65,17 @@ def _merge_config_layers(*layers: ProfileOverrides) -> ProfileOverrides:
             else:
                 merged[key] = value
     return merged
+
+
+def _merge_profile_and_scenario_settings(
+    profile_name: str,
+    catalog_defaults: ProfileOverrides,
+    profile_settings: ProfileOverrides,
+    scenario_settings: ScenarioOverrides,
+) -> ProfileOverrides:
+    if profile_name == DEFAULT_PROFILE_NAME:
+        return _merge_config_layers(catalog_defaults, profile_settings, scenario_settings)
+    return _merge_config_layers(catalog_defaults, scenario_settings, profile_settings)
 
 
 def _scenario_suffix(scenario_key: str) -> str:
@@ -161,7 +173,12 @@ def _materialize_profile(
     scenario_key = scenario_name or default_scenario_key
     scenario_settings = _get_scenario_settings(scenario_key)
 
-    merged = _merge_config_layers(catalog.defaults, profile_settings, scenario_settings)
+    merged = _merge_profile_and_scenario_settings(
+        profile_name,
+        catalog.defaults,
+        profile_settings,
+        scenario_settings,
+    )
     description = merged.pop("description", "")
     merged["scenario_key"] = scenario_key
     merged["scenario_description"] = description
@@ -213,10 +230,23 @@ def materialize_curriculum_profiles(
     stages: list[TrainingProfile] = []
     for stage_index, stage in enumerate(base_profile.curriculum):
         _get_scenario_settings(stage.scenario_key)
-        stage_profile = override_profile_scenario(base_profile, stage.scenario_key)
+        stage_profile = _materialize_profile(
+            profile_name=profile_name,
+            requested_timesteps=requested_timesteps,
+            scenario_name=stage.scenario_key,
+            seed=base_profile.seed + stage_index,
+        )
         if stage.requested_timesteps is not None:
             stage_profile = stage_profile.with_timesteps(stage.requested_timesteps)
-        stage_profile = stage_profile.with_seed(base_profile.seed + stage_index)
+        elif requested_timesteps is None:
+            scenario_default_profile = _materialize_profile(
+                profile_name=DEFAULT_PROFILE_NAME,
+                scenario_name=stage.scenario_key,
+                seed=base_profile.seed + stage_index,
+            )
+            stage_profile = stage_profile.with_timesteps(
+                scenario_default_profile.requested_timesteps
+            )
         stages.append(stage_profile)
     return stages
 
@@ -243,6 +273,9 @@ def override_profile_scenario(profile: TrainingProfile, scenario_name: str) -> T
 
 
 PROFILE_NAMES = tuple(sorted(load_training_catalog().profiles))
+ADVANCED_PROFILE_NAMES = tuple(
+    profile_name for profile_name in PROFILE_NAMES if profile_name not in PUBLIC_PROFILE_NAMES
+)
 SCENARIO_NAMES = tuple(sorted(load_training_catalog().scenarios))
 TRAINING_PROFILES = {
     profile_name: get_training_profile(profile_name) for profile_name in PROFILE_NAMES

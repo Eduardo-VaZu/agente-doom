@@ -1,9 +1,11 @@
 """Configuration models and training catalog accessors."""
 
 from doom_agent.config.profiles import (
+    ADVANCED_PROFILE_NAMES,
     DEFAULT_PROFILE_NAME,
     DEFAULT_SCENARIO_NAME,
     PROFILE_NAMES,
+    PUBLIC_PROFILE_NAMES,
     SCENARIO_NAMES,
     TRAINING_PROFILES,
     build_project_paths,
@@ -21,12 +23,14 @@ from doom_agent.config.schema import (
 )
 
 __all__ = [
+    "ADVANCED_PROFILE_NAMES",
     "DEFAULT_PROFILE_NAME",
     "DEFAULT_SCENARIO_NAME",
     "CurriculumStageConfig",
     "EarlyStoppingConfig",
     "PROFILE_NAMES",
     "ProjectPaths",
+    "PUBLIC_PROFILE_NAMES",
     "RewardShapingConfig",
     "SCENARIO_NAMES",
     "TRAINING_PROFILES",

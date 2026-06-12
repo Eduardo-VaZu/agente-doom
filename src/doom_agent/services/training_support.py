@@ -2,55 +2,26 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from math import inf
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
-import gymnasium as gym
 import numpy as np
 from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import VecEnv
 
-from doom_agent.config.schema import EarlyStoppingConfig, ProjectPaths, TrainingProfile
+from doom_agent.config.schema import TrainingProfile
+from doom_agent.services.early_stopping import EarlyStoppingTracker
 from doom_agent.models import build_recurrent_ppo_model
+from doom_agent.services.resume import ResumeState
 from doom_agent.shared.contracts import EvaluationMetricsPayload
 from doom_agent.utils.checkpoints import (
-    ResolvedCheckpoint,
     build_checkpoint_metadata,
     checkpoint_zip_path,
     load_checkpoint_metadata,
-    resolve_checkpoint,
-    resolve_latest_checkpoint,
     save_checkpoint_bundle,
 )
-
-AUTO_RESUME_MODE = "auto"
-LATEST_RESUME_MODE = "latest"
-
-
-@dataclass(frozen=True, slots=True)
-class ResumeState:
-    mode: str
-    checkpoint: ResolvedCheckpoint | None
-    note: str | None = None
-
-    @property
-    def is_resumed(self) -> bool:
-        return self.checkpoint is not None
-
-    @property
-    def resume_source(self) -> str | None:
-        if self.checkpoint is None:
-            return None
-        return str(checkpoint_zip_path(self.checkpoint.checkpoint_stem))
-
-    @property
-    def resume_saved_timesteps(self) -> int | None:
-        if self.checkpoint is None:
-            return None
-        return self.checkpoint.saved_timesteps
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,121 +32,8 @@ class EvaluationSettings:
     best_checkpoint_stem: Path
 
 
-@dataclass(slots=True)
-class EarlyStoppingTracker:
-    config: EarlyStoppingConfig
-    best_mean_reward: float = -inf
-    evaluations_seen: int = 0
-    no_improvement_evaluations: int = 0
-    stopped: bool = False
-    stop_reason: str | None = None
-
-    def register(self, mean_reward: float) -> bool:
-        improved = mean_reward > (self.best_mean_reward + self.config.min_delta)
-        self.evaluations_seen += 1
-
-        if improved:
-            self.best_mean_reward = mean_reward
-            self.no_improvement_evaluations = 0
-        else:
-            self.no_improvement_evaluations += 1
-
-        if (
-            self.config.enabled
-            and self.evaluations_seen >= self.config.min_evaluations
-            and self.no_improvement_evaluations >= self.config.patience_evaluations
-        ):
-            self.stopped = True
-            self.stop_reason = (
-                "Early stopping activado por falta de mejora en evaluacion: "
-                f"{self.no_improvement_evaluations} evaluaciones sin superar "
-                f"min_delta={self.config.min_delta}."
-            )
-        return improved
-
-
 def _next_multiple(current_timesteps: int, frequency: int) -> int:
     return ((current_timesteps // frequency) + 1) * frequency
-
-
-def _action_space_kind(action_space: gym.Space[Any]) -> str:
-    if isinstance(action_space, gym.spaces.Discrete):
-        return "discrete"
-    if isinstance(action_space, gym.spaces.MultiDiscrete):
-        return "multidiscrete"
-    raise ValueError(f"Action space no soportado para reanudacion: {action_space}")
-
-
-def _legacy_compatibility_issues(profile: TrainingProfile, checkpoint_stem: Path) -> list[str]:
-    legacy_model = RecurrentPPO.load(str(checkpoint_zip_path(checkpoint_stem)))
-    observation_shape = legacy_model.observation_space.shape
-    issues: list[str] = []
-
-    if observation_shape != (
-        profile.frame_stack,
-        profile.screen_height,
-        profile.screen_width,
-    ):
-        issues.append(
-            "La forma de observacion del checkpoint legacy "
-            f"{observation_shape} no coincide con {(profile.frame_stack, profile.screen_height, profile.screen_width)}."
-        )
-
-    checkpoint_action_space_kind = _action_space_kind(legacy_model.action_space)
-    if checkpoint_action_space_kind != profile.action_space_kind:
-        issues.append(
-            f"El action space del checkpoint legacy ({checkpoint_action_space_kind}) "
-            f"no coincide con el actual ({profile.action_space_kind})."
-        )
-    return issues
-
-
-def resolve_resume_state(
-    project_paths: ProjectPaths,
-    profile: TrainingProfile,
-    *,
-    resume_mode: str = AUTO_RESUME_MODE,
-    from_scratch: bool = False,
-    allow_scenario_change: bool = False,
-) -> ResumeState:
-    if from_scratch:
-        return ResumeState(mode="from_scratch", checkpoint=None)
-
-    if resume_mode in {AUTO_RESUME_MODE, LATEST_RESUME_MODE}:
-        checkpoint = resolve_latest_checkpoint(project_paths, profile.checkpoint_name)
-        if checkpoint is None:
-            return ResumeState(mode=resume_mode, checkpoint=None)
-    else:
-        checkpoint = resolve_checkpoint(project_paths, resume_mode)
-
-    if checkpoint.metadata is None:
-        issues = _legacy_compatibility_issues(profile, checkpoint.checkpoint_stem)
-        if issues:
-            formatted_issues = "\n".join(f"- {issue}" for issue in issues)
-            raise ValueError(
-                "El checkpoint legacy no es compatible con el entrenamiento actual:\n"
-                f"{formatted_issues}"
-            )
-        note = (
-            "Checkpoint legacy sin metadata completa. Se valido observation/action space, "
-            "pero no fue posible comparar todos los hiperparametros."
-        )
-        return ResumeState(mode=resume_mode, checkpoint=checkpoint, note=note)
-
-    previous_profile = TrainingProfile.from_dict(checkpoint.metadata["profile"])
-    if allow_scenario_change:
-        issues = profile.model_compatibility_issues(previous_profile)
-    else:
-        issues = profile.resume_compatibility_issues(previous_profile)
-    if issues:
-        formatted_issues = "\n".join(f"- {issue}" for issue in issues)
-        raise ValueError(
-            "El checkpoint encontrado no es compatible con el perfil actual. "
-            "Usa '--from-scratch' o ajusta el perfil.\n"
-            f"{formatted_issues}"
-        )
-
-    return ResumeState(mode=resume_mode, checkpoint=checkpoint)
 
 
 def load_training_model(

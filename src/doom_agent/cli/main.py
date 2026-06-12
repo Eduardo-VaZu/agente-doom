@@ -7,20 +7,21 @@ from doom_agent.cli.evaluate import add_evaluate_arguments
 from doom_agent.cli.train import add_train_arguments
 from doom_agent.config import (
     DEFAULT_PROFILE_NAME,
-    PROFILE_NAMES,
     SCENARIO_NAMES,
     build_project_paths,
     get_training_profile,
 )
-from doom_agent.services.evaluator import evaluate
-from doom_agent.services.sweeps import run_sweep
-from doom_agent.services.trainer import train
 from doom_agent.utils.checkpoints import list_all_checkpoints, resolve_checkpoint_preference
 from doom_agent.utils.reports import list_experiment_runs
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="CLI unificada para el proyecto Agente Doom.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "CLI unificada para Agente Doom. "
+            "Flujo normal: entrena con 'train --scenario <escenario>'."
+        )
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     train_parser = subparsers.add_parser("train", help="Entrena el agente.")
@@ -32,9 +33,9 @@ def _build_parser() -> argparse.ArgumentParser:
     sweep_parser = subparsers.add_parser("sweep", help="Ejecuta un sweep secuencial.")
     sweep_parser.add_argument(
         "--config",
-        choices=PROFILE_NAMES,
-        default="fast",
-        help="Perfil base para el sweep.",
+        choices=(DEFAULT_PROFILE_NAME,),
+        default=DEFAULT_PROFILE_NAME,
+        help="Configuracion base para el sweep. Usa el flujo normal 'default'.",
     )
     sweep_parser.add_argument(
         "--scenario",
@@ -86,7 +87,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="No guardar el mejor modelo por variante.",
     )
 
-    subparsers.add_parser("list-profiles", help="Lista perfiles y escenarios disponibles.")
+    subparsers.add_parser("list-scenarios", help="Lista escenarios del flujo normal.")
+    subparsers.add_parser(
+        "list-profiles",
+        help="Alias compatible de 'list-scenarios'.",
+    )
 
     list_checkpoints_parser = subparsers.add_parser(
         "list-checkpoints", help="Lista checkpoints conocidos."
@@ -115,22 +120,20 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_profiles() -> None:
-    print("Perfiles:")
-    for profile_name in PROFILE_NAMES:
-        profile = get_training_profile(profile_name)
-        print(
-            f"- {profile_name}: scenario={profile.scenario_key}, "
-            f"timesteps={profile.requested_timesteps}, seed={profile.seed}, "
-            f"checkpoint={profile.checkpoint_name}, curriculum={len(profile.curriculum)} etapas"
-        )
+def _print_scenarios() -> None:
+    default_profile = get_training_profile(DEFAULT_PROFILE_NAME)
+    print("Configuracion publica:")
+    print(
+        f"- {DEFAULT_PROFILE_NAME}: flujo normal por escenario, seed={default_profile.seed}, "
+        f"render={default_profile.render}, record_video={default_profile.record_video}"
+    )
 
-    print("Escenarios:")
+    print("Escenarios para entrenamiento normal:")
     for scenario_name in SCENARIO_NAMES:
         profile = get_training_profile(DEFAULT_PROFILE_NAME, scenario_name=scenario_name)
         print(
             f"- {scenario_name}: file={profile.scenario_name}, "
-            f"checkpoint={profile.checkpoint_name}"
+            f"timesteps={profile.requested_timesteps}, checkpoint={profile.checkpoint_name}"
         )
 
 
@@ -205,6 +208,10 @@ def _parse_int_csv(values: str | None, fallback: int) -> tuple[int, ...]:
 
 
 def main() -> None:
+    from doom_agent.services.evaluator import evaluate
+    from doom_agent.services.sweeps import run_sweep
+    from doom_agent.services.trainer import train
+
     parser = _build_parser()
     args = parser.parse_args()
 
@@ -257,8 +264,8 @@ def main() -> None:
         )
         return
 
-    if args.command == "list-profiles":
-        _print_profiles()
+    if args.command in {"list-profiles", "list-scenarios"}:
+        _print_scenarios()
         return
 
     if args.command == "list-checkpoints":

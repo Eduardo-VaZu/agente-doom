@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from doom_agent.config.schema import EarlyStoppingConfig
-from doom_agent.services.training_support import EarlyStoppingTracker
+from doom_agent.services.early_stopping import EarlyStoppingTracker
 
 
 class EarlyStoppingTests(unittest.TestCase):

@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-
-from vizdoom import ViZDoomUnexpectedExitException
+from typing import TYPE_CHECKING
 
 from doom_agent.config import (
     build_project_paths,
@@ -13,15 +12,7 @@ from doom_agent.config import (
     materialize_curriculum_profiles,
 )
 from doom_agent.config.schema import TrainingProfile
-from doom_agent.envs import make_vectorized_env
-from doom_agent.services.training_support import (
-    AUTO_RESUME_MODE,
-    EvaluationSettings,
-    PeriodicTrainingCallback,
-    ResumeState,
-    load_training_model,
-    resolve_resume_state,
-)
+from doom_agent.services.resume import AUTO_RESUME_MODE
 from doom_agent.utils.checkpoints import (
     best_checkpoint_stem,
     build_checkpoint_metadata,
@@ -34,6 +25,16 @@ from doom_agent.utils.reports import (
     build_training_run_report,
     save_training_run_report,
 )
+
+if TYPE_CHECKING:
+    from doom_agent.services.resume import ResumeState
+    from doom_agent.services.training_support import EvaluationSettings
+
+try:
+    from vizdoom import ViZDoomUnexpectedExitException
+except ModuleNotFoundError:  # pragma: no cover - only used in lightweight test environments
+    class ViZDoomUnexpectedExitException(Exception):
+        pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +50,7 @@ class TrainingExecutionResult:
     stop_reason: str | None
 
 
-def select_curriculum_resume_path(result: TrainingExecutionResult) -> Path:
+def select_resume_checkpoint_path(result: TrainingExecutionResult) -> Path:
     final_checkpoint_stem = result.final_checkpoint_path.with_suffix("")
     best_checkpoint_path = checkpoint_zip_path(best_checkpoint_stem(final_checkpoint_stem))
     if best_checkpoint_path.exists():
@@ -132,6 +133,14 @@ def train_profile(
     allow_scenario_resume: bool = False,
     run_label: str | None = None,
 ) -> TrainingExecutionResult:
+    from doom_agent.envs import make_vectorized_env
+    from doom_agent.services.resume import resolve_resume_state
+    from doom_agent.services.training_support import (
+        EvaluationSettings,
+        PeriodicTrainingCallback,
+        load_training_model,
+    )
+
     project_paths = build_project_paths()
     if eval_episodes <= 0:
         raise ValueError("'eval_episodes' debe ser mayor que cero.")
@@ -332,7 +341,7 @@ def train(
             )
             if last_result.training_status in {"keyboard_interrupt", "vizdoom_exit"}:
                 break
-            stage_resume_mode = str(select_curriculum_resume_path(last_result))
+            stage_resume_mode = str(select_resume_checkpoint_path(last_result))
             stage_from_scratch = False
 
         if last_result is None:

@@ -12,7 +12,7 @@ from doom_agent.services.sweeps import build_sweep_run_specs
 
 class SweepTests(unittest.TestCase):
     def test_build_sweep_run_specs_creates_unique_variants(self) -> None:
-        profile = get_training_profile("fast")
+        profile = get_training_profile("default")
         specs = build_sweep_run_specs(
             profile,
             learning_rates=(0.0001, 0.0002),

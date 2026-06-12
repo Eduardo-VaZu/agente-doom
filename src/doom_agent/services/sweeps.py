@@ -5,7 +5,10 @@ from itertools import product
 
 from doom_agent.config import get_training_profile
 from doom_agent.config.schema import TrainingProfile
-from doom_agent.services.trainer import TrainingExecutionResult, train_profile
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from doom_agent.services.trainer import TrainingExecutionResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +78,8 @@ def run_sweep(
     eval_episodes: int = 5,
     save_best: bool = True,
 ) -> list[TrainingExecutionResult]:
+    from doom_agent.services.trainer import train_profile
+
     base_profile = get_training_profile(
         profile_name=profile_name,
         requested_timesteps=requested_timesteps,

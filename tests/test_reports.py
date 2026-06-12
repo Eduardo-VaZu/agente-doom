@@ -23,12 +23,12 @@ class ReportTests(unittest.TestCase):
         root_dir = Path("artifacts") / "test-temp" / "reports"
         shutil.rmtree(root_dir, ignore_errors=True)
         project_paths = build_project_paths(root_dir=root_dir)
-        profile = get_training_profile("fast", seed=123)
+        profile = get_training_profile("default", seed=123)
         run_id = build_run_id(profile)
         report = build_training_run_report(
             run_id=run_id,
             created_at_utc="2026-01-01T00:00:00+00:00",
-            profile_name="fast",
+            profile_name="default",
             run_label="manual:test",
             profile=profile,
             checkpoint_path=project_paths.checkpoints_dir / f"{profile.checkpoint_name}.zip",

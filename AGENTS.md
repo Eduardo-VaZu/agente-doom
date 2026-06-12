@@ -9,6 +9,12 @@
 ## Commands
 
 ```powershell
+# Make shortcuts
+make help
+make check
+make train SCENARIO=basic
+make list-scenarios
+
 # Lint -> Typecheck -> Test (CI order)
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m mypy
@@ -32,10 +38,11 @@
 
 | Command | Purpose |
 |---|---|
-| `train` | Train agent (supports `--from-scratch`, `--resume`, `--config`, `--scenario`, `--seed`) |
+| `train` | Train normal flow by scenario. Recommended: `train --scenario <scenario>` |
 | `evaluate` | Evaluate a checkpoint (`--select best\|last`) |
-| `sweep` | Sequential hyperparameter sweep (`--learning-rates`, `--n-steps-values`, `--batch-sizes`, `--seeds`) |
-| `list-profiles` | Show available profiles and scenarios |
+| `sweep` | Advanced sequential hyperparameter sweep (`--learning-rates`, `--n-steps-values`, `--batch-sizes`, `--seeds`) |
+| `list-scenarios` | Show available scenarios for normal flow |
+| `list-profiles` | Backward-compatible alias of `list-scenarios` |
 | `list-checkpoints` | List known checkpoints |
 | `list-runs` | List training run reports |
 | `inspect-checkpoint` | Show checkpoint metadata JSON |
@@ -51,6 +58,7 @@
 ## Key Behaviors
 
 - **Auto-resume**: Training resumes from last compatible checkpoint by default. Use `--from-scratch` to force fresh training.
+- **Public training flow**: normal training uses implicit `default` profile plus explicit `--scenario`.
 - **RecurrentPPO trains in `n_steps` blocks**: effective timesteps may exceed requested. Both values are printed.
 - **Checkpoint naming**: includes `__<scenario>` suffix when `--scenario` differs from profile default to avoid collisions.
 - **Curriculum profiles**: stages train sequentially; each stage resumes from the `best_model` of the previous stage.
@@ -70,12 +78,8 @@
 - Test files create temp dirs under `artifacts/test-temp/` and clean up in `finally` blocks.
 - Environment tests actually instantiate ViZDoom — may be slow or require ViZDoom native libs.
 
-## Profiles (training_profiles.toml)
+## Training Flow (training_profiles.toml)
 
-| Profile | Purpose | Timesteps | Notes |
+| Flow/Profile | Purpose | Timesteps | Notes |
 |---|---|---|---|
-| `default` | Full training | 500k | render+video on |
-| `fast` | Quick iteration | 10k | render+video off |
-| `efficient` | Mid-range | 100k | render+video off |
-| `curriculum_fast` | 3-stage curriculum | 2048/stage | early stopping on |
-| `all_scenarios` | 4-stage curriculum | varies | early stopping on |
+| `default` | Public normal training | Scenario-specific | render+video on, use with `--scenario` |

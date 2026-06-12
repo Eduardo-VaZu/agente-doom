@@ -9,8 +9,8 @@ from typing import cast
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
-from doom_agent.services.trainer import TrainingExecutionResult, select_curriculum_resume_path
-from doom_agent.services.training_support import resolve_resume_state
+from doom_agent.services.resume import resolve_resume_state
+from doom_agent.services.trainer import TrainingExecutionResult, select_resume_checkpoint_path
 from doom_agent.shared.contracts import CheckpointMetadataPayload, EvaluationMetricsPayload
 from doom_agent.utils.checkpoints import (
     build_checkpoint_metadata,
@@ -30,9 +30,9 @@ class DummyModel:
 
 class CheckpointTests(unittest.TestCase):
     def test_save_checkpoint_bundle_creates_zip_and_metadata(self) -> None:
-        profile = get_training_profile("fast", requested_timesteps=8)
+        profile = get_training_profile("default", requested_timesteps=8)
         metadata = build_checkpoint_metadata(
-            "fast",
+            "default",
             profile,
             saved_timesteps=profile.effective_timesteps,
             resume_source="artifacts/checkpoints/previous.zip",
@@ -50,7 +50,7 @@ class CheckpointTests(unittest.TestCase):
         shutil.rmtree(temp_dir, ignore_errors=True)
         temp_dir.mkdir(parents=True, exist_ok=True)
         try:
-            checkpoint_stem = temp_dir / "ppo_doom_recurrent_fast"
+            checkpoint_stem = temp_dir / "ppo_doom_recurrent_default"
             save_checkpoint_bundle(DummyModel(), checkpoint_stem, metadata)
 
             self.assertTrue(checkpoint_zip_path(checkpoint_stem).exists())
@@ -59,8 +59,8 @@ class CheckpointTests(unittest.TestCase):
             loaded_metadata = load_checkpoint_metadata(checkpoint_stem)
             self.assertIsNotNone(loaded_metadata)
             loaded_metadata = cast(CheckpointMetadataPayload, loaded_metadata)
-            self.assertEqual(loaded_metadata["profile_name"], "fast")
-            self.assertEqual(loaded_metadata["saved_timesteps"], 256)
+            self.assertEqual(loaded_metadata["profile_name"], "default")
+            self.assertEqual(loaded_metadata["saved_timesteps"], 2048)
             self.assertEqual(loaded_metadata["resume_saved_timesteps"], 10240)
             self.assertEqual(loaded_metadata["training_status"], "completed")
             evaluation_metrics = cast(
@@ -77,7 +77,7 @@ class CheckpointTests(unittest.TestCase):
         project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
         project_paths.auto_checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-        profile = get_training_profile("fast")
+        profile = get_training_profile("default")
         final_checkpoint = project_paths.checkpoints_dir / profile.checkpoint_name
         auto_checkpoint = (
             project_paths.auto_checkpoints_dir / f"{profile.checkpoint_name}_12000_steps"
@@ -87,12 +87,12 @@ class CheckpointTests(unittest.TestCase):
             save_checkpoint_bundle(
                 DummyModel(),
                 final_checkpoint,
-                build_checkpoint_metadata("fast", profile, saved_timesteps=10000),
+                build_checkpoint_metadata("default", profile, saved_timesteps=10000),
             )
             save_checkpoint_bundle(
                 DummyModel(),
                 auto_checkpoint,
-                build_checkpoint_metadata("fast", profile, saved_timesteps=12000),
+                build_checkpoint_metadata("default", profile, saved_timesteps=12000),
             )
 
             resolved = resolve_latest_checkpoint(project_paths, profile.checkpoint_name)
@@ -109,15 +109,15 @@ class CheckpointTests(unittest.TestCase):
         project_paths = build_project_paths(root_dir=root_dir)
         project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-        previous_profile = get_training_profile("fast", scenario_name="basic")
-        current_profile = get_training_profile("fast", scenario_name="deadly_corridor")
+        previous_profile = get_training_profile("default", scenario_name="basic")
+        current_profile = get_training_profile("default", scenario_name="deadly_corridor")
         checkpoint_stem = project_paths.checkpoints_dir / current_profile.checkpoint_name
 
         try:
             save_checkpoint_bundle(
                 DummyModel(),
                 checkpoint_stem,
-                build_checkpoint_metadata("fast", previous_profile, saved_timesteps=10000),
+                build_checkpoint_metadata("default", previous_profile, saved_timesteps=10000),
             )
 
             with self.assertRaises(ValueError):
@@ -133,15 +133,15 @@ class CheckpointTests(unittest.TestCase):
         project_paths = build_project_paths(root_dir=root_dir)
         project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-        previous_profile = get_training_profile("fast", scenario_name="basic")
-        current_profile = get_training_profile("fast", scenario_name="defend_the_center")
+        previous_profile = get_training_profile("default", scenario_name="basic")
+        current_profile = get_training_profile("default", scenario_name="defend_the_center")
         checkpoint_stem = project_paths.checkpoints_dir / previous_profile.checkpoint_name
 
         try:
             save_checkpoint_bundle(
                 DummyModel(),
                 checkpoint_stem,
-                build_checkpoint_metadata("fast", previous_profile, saved_timesteps=10000),
+                build_checkpoint_metadata("default", previous_profile, saved_timesteps=10000),
             )
 
             resume_state = resolve_resume_state(
@@ -161,7 +161,7 @@ class CheckpointTests(unittest.TestCase):
         project_paths = build_project_paths(root_dir=root_dir)
         project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-        profile = get_training_profile("fast")
+        profile = get_training_profile("default")
         final_checkpoint = project_paths.checkpoints_dir / profile.checkpoint_name
         best_checkpoint = project_paths.checkpoints_dir / f"{profile.checkpoint_name}_best"
 
@@ -169,13 +169,13 @@ class CheckpointTests(unittest.TestCase):
             save_checkpoint_bundle(
                 DummyModel(),
                 final_checkpoint,
-                build_checkpoint_metadata("fast", profile, saved_timesteps=10000),
+                build_checkpoint_metadata("default", profile, saved_timesteps=10000),
             )
             save_checkpoint_bundle(
                 DummyModel(),
                 best_checkpoint,
                 build_checkpoint_metadata(
-                    "fast",
+                    "default",
                     profile,
                     saved_timesteps=9000,
                     training_status="best_model",
@@ -192,8 +192,8 @@ class CheckpointTests(unittest.TestCase):
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)
 
-    def test_curriculum_resume_prefers_best_checkpoint_when_available(self) -> None:
-        root_dir = Path("artifacts") / "test-temp" / "curriculum-best-selection"
+    def test_select_resume_checkpoint_path_prefers_best_checkpoint_when_available(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "resume-best-selection"
         shutil.rmtree(root_dir, ignore_errors=True)
         checkpoint_dir = root_dir / "checkpoints"
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -204,8 +204,8 @@ class CheckpointTests(unittest.TestCase):
 
         try:
             result = TrainingExecutionResult(
-                profile_name="fast",
-                profile=get_training_profile("fast"),
+                profile_name="default",
+                profile=get_training_profile("default"),
                 final_checkpoint_path=final_checkpoint_path,
                 report_path=root_dir / "report.json",
                 training_status="completed",
@@ -215,6 +215,6 @@ class CheckpointTests(unittest.TestCase):
                 stop_reason=None,
             )
 
-            self.assertEqual(select_curriculum_resume_path(result), best_checkpoint_path)
+            self.assertEqual(select_resume_checkpoint_path(result), best_checkpoint_path)
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)
