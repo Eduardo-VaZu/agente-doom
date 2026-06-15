@@ -32,15 +32,18 @@ def build_project_paths(root_dir: Path | None = None) -> ProjectPaths:
     legacy_logs_dir = resolved_root / "logs"
     checkpoints_dir = artifacts_dir / "checkpoints"
     config_dir = resolved_root / "configs"
+    scenario_configs_dir = config_dir / "scenarios"
     reports_dir = artifacts_dir / "reports"
 
     return ProjectPaths(
         root_dir=resolved_root,
         config_dir=config_dir,
-        training_catalog_path=config_dir / "training_profiles.toml",
+        training_catalog_path=config_dir / "base.toml",
+        scenario_configs_dir=scenario_configs_dir,
         data_dir=resolved_root / "data",
         scenarios_dir=resolved_root / "data" / "scenarios",
         artifacts_dir=artifacts_dir,
+        runs_dir=artifacts_dir / "runs",
         checkpoints_dir=checkpoints_dir,
         auto_checkpoints_dir=checkpoints_dir / "auto",
         tensorboard_dir=artifacts_dir / "tensorboard",
@@ -103,13 +106,22 @@ def _require_str(config: ProfileOverrides, key: str) -> str:
 @lru_cache(maxsize=1)
 def load_training_catalog() -> TrainingCatalog:
     project_paths = build_project_paths()
-    config_path = project_paths.training_catalog_path
-    raw_catalog = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    raw_catalog = tomllib.loads(project_paths.training_catalog_path.read_text(encoding="utf-8"))
+    scenarios: dict[str, ScenarioOverrides] = {}
+
+    for scenario_config_path in sorted(project_paths.scenario_configs_dir.glob("*.toml")):
+        scenario_document = tomllib.loads(scenario_config_path.read_text(encoding="utf-8"))
+        scenario_settings = cast(
+            ScenarioOverrides,
+            scenario_document.get("scenario", {}),
+        )
+        scenario_key = scenario_config_path.stem
+        scenarios[scenario_key] = scenario_settings
 
     return TrainingCatalog(
         defaults=cast(ProfileOverrides, raw_catalog.get("defaults", {})),
         profiles=cast(CatalogSection, raw_catalog.get("profiles", {})),
-        scenarios=cast(dict[str, ScenarioOverrides], raw_catalog.get("scenarios", {})),
+        scenarios=scenarios,
     )
 
 

@@ -83,6 +83,11 @@ class TrainingRunReportPayload(TypedDict):
     checkpoint_name: str
     checkpoint_path: str
     best_checkpoint_path: str | None
+    checkpoint_archive_path: str
+    best_checkpoint_archive_path: str | None
+    run_dir: str
+    tensorboard_dir: str
+    videos_dir: str
     training_status: str
     completed: bool
     requested_timesteps: int
@@ -107,6 +112,8 @@ class ExperimentIndexEntryPayload(TypedDict):
     checkpoint_name: str
     checkpoint_path: str
     best_checkpoint_path: str | None
+    checkpoint_archive_path: str
+    best_checkpoint_archive_path: str | None
     saved_timesteps: int
     training_status: str
     mean_reward: float | None

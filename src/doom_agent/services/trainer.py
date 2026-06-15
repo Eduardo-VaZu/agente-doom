@@ -13,10 +13,12 @@ from doom_agent.config import (
 )
 from doom_agent.config.schema import TrainingProfile
 from doom_agent.services.resume import AUTO_RESUME_MODE
+from doom_agent.storage import build_run_artifact_paths
 from doom_agent.utils.checkpoints import (
     best_checkpoint_stem,
     build_checkpoint_metadata,
     checkpoint_zip_path,
+    copy_checkpoint_bundle,
     save_checkpoint_bundle,
 )
 from doom_agent.utils.filesystem import ensure_directories
@@ -30,11 +32,19 @@ if TYPE_CHECKING:
     from doom_agent.services.resume import ResumeState
     from doom_agent.services.training_support import EvaluationSettings
 
-try:
-    from vizdoom import ViZDoomUnexpectedExitException
-except ModuleNotFoundError:  # pragma: no cover - only used in lightweight test environments
-    class ViZDoomUnexpectedExitException(Exception):
-        pass
+def _resolve_vizdoom_exit_exception() -> type[Exception]:
+    try:
+        from vizdoom import ViZDoomUnexpectedExitException as resolved_exception
+    except ModuleNotFoundError:  # pragma: no cover - only used in lightweight test environments
+        class FallbackViZDoomUnexpectedExitException(Exception):
+            pass
+
+        return FallbackViZDoomUnexpectedExitException
+
+    return resolved_exception
+
+
+ViZDoomUnexpectedExitException = _resolve_vizdoom_exit_exception()
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,9 +162,11 @@ def train_profile(
     ensure_directories(
         [
             project_paths.artifacts_dir,
+            project_paths.runs_dir,
             project_paths.checkpoints_dir,
             project_paths.auto_checkpoints_dir,
             project_paths.tensorboard_dir,
+            project_paths.videos_dir,
             project_paths.reports_dir,
         ]
     )
@@ -173,12 +185,27 @@ def train_profile(
         best_checkpoint_stem=project_paths.checkpoints_dir / f"{profile.checkpoint_name}_best",
     )
 
-    env = make_vectorized_env(profile, project_paths)
+    final_checkpoint_stem = project_paths.checkpoints_dir / profile.checkpoint_name
+    run_created_at = datetime.now(UTC)
+    run_id = build_run_id(profile, run_created_at)
+    run_artifacts = build_run_artifact_paths(project_paths, run_id)
+    started_at = perf_counter()
+    final_checkpoint_path = checkpoint_zip_path(final_checkpoint_stem)
+    report_path: Path | None = None
+    ensure_directories(
+        [
+            run_artifacts.run_dir,
+            run_artifacts.checkpoints_dir,
+            run_artifacts.tensorboard_dir,
+            run_artifacts.videos_dir,
+        ]
+    )
+    env = make_vectorized_env(profile, project_paths, video_dir=run_artifacts.videos_dir)
     env.seed(profile.seed)
     eval_profile = profile.for_evaluation(render=False).with_seed(profile.seed + 1)
     eval_env = make_vectorized_env(eval_profile, project_paths)
     eval_env.seed(eval_profile.seed)
-    model = load_training_model(env, profile, project_paths.tensorboard_dir, resume_state)
+    model = load_training_model(env, profile, run_artifacts.tensorboard_dir, resume_state)
     callback = PeriodicTrainingCallback(
         profile_name=profile_name,
         profile=profile,
@@ -188,13 +215,6 @@ def train_profile(
         resume_state=resume_state,
         verbose=1,
     )
-
-    final_checkpoint_stem = project_paths.checkpoints_dir / profile.checkpoint_name
-    run_created_at = datetime.now(UTC)
-    run_id = build_run_id(profile, run_created_at)
-    started_at = perf_counter()
-    final_checkpoint_path = checkpoint_zip_path(final_checkpoint_stem)
-    report_path: Path | None = None
     print_training_summary(
         profile_name,
         profile,
@@ -236,6 +256,7 @@ def train_profile(
             is_best_checkpoint=False,
         )
         save_checkpoint_bundle(model, final_checkpoint_stem, metadata)
+        copy_checkpoint_bundle(final_checkpoint_stem, run_artifacts.final_checkpoint_stem)
         try:
             env.close()
         except ViZDoomUnexpectedExitException:
@@ -246,12 +267,18 @@ def train_profile(
             pass
 
         best_checkpoint_path = checkpoint_zip_path(best_checkpoint_stem(final_checkpoint_stem))
+        if best_checkpoint_path.exists():
+            copy_checkpoint_bundle(
+                best_checkpoint_stem(final_checkpoint_stem),
+                run_artifacts.best_checkpoint_stem,
+            )
         report = build_training_run_report(
             run_id=run_id,
             created_at_utc=run_created_at.isoformat(),
             profile_name=profile_name,
             run_label=run_label,
             profile=profile,
+            run_artifacts=run_artifacts,
             checkpoint_path=final_checkpoint_path,
             best_checkpoint_path=best_checkpoint_path if best_checkpoint_path.exists() else None,
             training_status=training_status,

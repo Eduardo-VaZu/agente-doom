@@ -9,7 +9,7 @@ from typing import Any, cast
 import gymnasium as gym
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
 from doom_agent.envs import make_vectorized_env
@@ -123,25 +123,14 @@ class EnvironmentSmokeTests(unittest.TestCase):
         )
         self.assertTrue(all("MOVE_FORWARD" in label for label in labels))
 
-    def test_focused_action_presets_match_available_scenario_buttons(self) -> None:
+    def test_basic_action_preset_matches_available_buttons(self) -> None:
         project_paths = build_project_paths()
-
-        scenario_expectations = {
-            "basic": ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
-            "deadly_corridor": ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
-            "defend_the_center": ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
-            "health_gathering": (
-                "MOVE_FORWARD",
-                "TURN_LEFT+MOVE_FORWARD",
-                "TURN_RIGHT+MOVE_FORWARD",
-            ),
-        }
-
-        for scenario_name, expected_labels in scenario_expectations.items():
-            with self.subTest(scenario=scenario_name):
-                profile = get_training_profile("default", scenario_name=scenario_name)
-                env = make_vectorized_env(profile, project_paths)
-                try:
-                    self.assertEqual(env.get_attr("action_labels")[0], expected_labels)
-                finally:
-                    env.close()
+        profile = get_training_profile("default")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+            )
+        finally:
+            env.close()

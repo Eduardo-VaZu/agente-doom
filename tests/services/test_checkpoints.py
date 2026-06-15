@@ -6,10 +6,9 @@ import unittest
 from pathlib import Path
 from typing import cast
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
-from doom_agent.services.resume import resolve_resume_state
 from doom_agent.services.trainer import TrainingExecutionResult, select_resume_checkpoint_path
 from doom_agent.shared.contracts import CheckpointMetadataPayload, EvaluationMetricsPayload
 from doom_agent.utils.checkpoints import (
@@ -100,58 +99,6 @@ class CheckpointTests(unittest.TestCase):
             assert resolved is not None
             self.assertEqual(resolved.checkpoint_stem, auto_checkpoint)
             self.assertEqual(resolved.saved_timesteps, 12000)
-        finally:
-            shutil.rmtree(root_dir, ignore_errors=True)
-
-    def test_resolve_resume_state_rejects_incompatible_checkpoint_metadata(self) -> None:
-        root_dir = Path("artifacts") / "test-temp" / "resume-compatibility"
-        shutil.rmtree(root_dir, ignore_errors=True)
-        project_paths = build_project_paths(root_dir=root_dir)
-        project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
-
-        previous_profile = get_training_profile("default", scenario_name="basic")
-        current_profile = get_training_profile("default", scenario_name="deadly_corridor")
-        checkpoint_stem = project_paths.checkpoints_dir / current_profile.checkpoint_name
-
-        try:
-            save_checkpoint_bundle(
-                DummyModel(),
-                checkpoint_stem,
-                build_checkpoint_metadata("default", previous_profile, saved_timesteps=10000),
-            )
-
-            with self.assertRaises(ValueError):
-                resolve_resume_state(
-                    project_paths, current_profile, resume_mode=str(checkpoint_stem)
-                )
-        finally:
-            shutil.rmtree(root_dir, ignore_errors=True)
-
-    def test_resolve_resume_state_allows_explicit_scenario_transfer(self) -> None:
-        root_dir = Path("artifacts") / "test-temp" / "resume-scenario-transfer"
-        shutil.rmtree(root_dir, ignore_errors=True)
-        project_paths = build_project_paths(root_dir=root_dir)
-        project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
-
-        previous_profile = get_training_profile("default", scenario_name="basic")
-        current_profile = get_training_profile("default", scenario_name="defend_the_center")
-        checkpoint_stem = project_paths.checkpoints_dir / previous_profile.checkpoint_name
-
-        try:
-            save_checkpoint_bundle(
-                DummyModel(),
-                checkpoint_stem,
-                build_checkpoint_metadata("default", previous_profile, saved_timesteps=10000),
-            )
-
-            resume_state = resolve_resume_state(
-                project_paths,
-                current_profile,
-                resume_mode=str(checkpoint_stem),
-                allow_scenario_change=True,
-            )
-
-            self.assertTrue(resume_state.is_resumed)
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)
 

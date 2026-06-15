@@ -13,9 +13,7 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         "--config",
         choices=PROFILE_NAMES,
         default=DEFAULT_PROFILE_NAME,
-        help=(
-            "Configuracion base a usar. Flujo normal: omitir esta bandera y elegir solo '--scenario'."
-        ),
+        help="Configuracion base del modelo foundation.",
     )
     parser.add_argument(
         "--timesteps",
@@ -27,7 +25,7 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         "--scenario",
         choices=SCENARIO_NAMES,
         default=None,
-        help="Escenario del entrenamiento normal. Si se omite, usa el preset por defecto ('basic').",
+        help="Escenario de entrenamiento actual. Hoy el flujo activo usa 'basic'.",
     )
     parser.add_argument(
         "--seed",
@@ -53,7 +51,7 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         action="store_true",
         help=(
             "Permite usar un checkpoint de otro escenario cuando la arquitectura "
-            "del modelo es compatible. Usalo solo para transferencia explicita."
+            "del modelo es compatible."
         ),
     )
     parser.add_argument(
@@ -80,8 +78,8 @@ def parse_args() -> argparse.Namespace:
     parser = add_train_arguments(
         argparse.ArgumentParser(
             description=(
-                "Entrenamiento normal por escenario para Agente Doom. "
-                "Usa 'train --scenario <escenario>' como flujo recomendado."
+                "Entrena modelo foundation. "
+                "Etapa activa actual: escenario basic."
             )
         )
     )

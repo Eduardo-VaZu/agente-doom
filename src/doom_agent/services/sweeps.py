@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from itertools import product
+from typing import TYPE_CHECKING
 
 from doom_agent.config import get_training_profile
 from doom_agent.config.schema import TrainingProfile
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from doom_agent.services.trainer import TrainingExecutionResult

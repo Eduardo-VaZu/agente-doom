@@ -1,12 +1,12 @@
 # Agente Doom
 
-Agente de aprendizaje por refuerzo para escenarios de ViZDoom usando `Gymnasium`, `Stable-Baselines3` y `RecurrentPPO`.
+Proyecto de ViZDoom con `Gymnasium`, `Stable-Baselines3` y `RecurrentPPO`.
 
-Estado actual del proyecto:
-- un solo flujo publico de entrenamiento
-- una sola configuracion base: `default`
-- optimizacion real por escenario desde `configs/training_profiles.toml`
-- checkpoints, reportes, TensorBoard y videos en `artifacts/`
+Estado actual:
+- entrenamiento activo para modelo `foundation`
+- escenario activo actual: `basic`
+- evaluacion, inspeccion y reportes historicos disponibles
+- arquitectura lista para agregar escenarios uno por uno
 
 ## Requisitos
 
@@ -23,24 +23,15 @@ py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-## Flujo Rapido
+## Flujo rapido
 
-Listar escenarios:
-
-```powershell
-.\.venv\Scripts\python.exe src\cli.py list-scenarios
-```
-
-Entrenar escenario normal:
+Entrenar modelo `foundation`:
 
 ```powershell
 .\.venv\Scripts\python.exe src\cli.py train --scenario basic
-.\.venv\Scripts\python.exe src\cli.py train --scenario defend_the_center
-.\.venv\Scripts\python.exe src\cli.py train --scenario deadly_corridor
-.\.venv\Scripts\python.exe src\cli.py train --scenario health_gathering
 ```
 
-Evaluar checkpoint del escenario:
+Evaluar checkpoint resuelto por escenario:
 
 ```powershell
 .\.venv\Scripts\python.exe src\cli.py evaluate --scenario basic
@@ -52,95 +43,86 @@ Inspeccionar metadata:
 .\.venv\Scripts\python.exe src\cli.py inspect-checkpoint --scenario basic
 ```
 
+Listar checkpoints y reportes:
+
+```powershell
+.\.venv\Scripts\python.exe src\cli.py list-checkpoints --limit 10
+.\.venv\Scripts\python.exe src\cli.py list-runs --limit 10
+```
+
 ## Makefile
 
-Atajos principales:
+Atajos:
 
 ```powershell
 make help
+make setup
+make bootstrap
 make install
 make check
-make list-scenarios
-make train SCENARIO=basic
-make train SCENARIO=deadly_corridor RESUME=latest
-make evaluate SCENARIO=health_gathering
+make train
+make train-from-scratch
+make train-latest
+make evaluate SCENARIO=basic
+make evaluate-last SCENARIO=basic
+make play SCENARIO=basic
 make inspect SCENARIO=basic
-make sweep SCENARIO=basic LEARNING_RATES=0.0001,0.0002 N_STEPS_VALUES=1024,2048 BATCH_SIZES=32,64 SEEDS=42,43
+make list-checkpoints LIMIT=10
+make list-runs LIMIT=10
+make tensorboard
 ```
 
-Targets utiles:
-- `make train-basic`
-- `make train-defend`
-- `make train-deadly`
-- `make train-health`
-- `make list-checkpoints LIMIT=10`
-- `make list-runs LIMIT=10`
-- `make tensorboard`
+## CLI publica
 
-## CLI
-
-Comandos publicos:
+Comandos disponibles:
 - `train`
 - `evaluate`
 - `inspect-checkpoint`
-- `list-scenarios`
 - `list-checkpoints`
 - `list-runs`
 
-Alias compatible:
-- `list-profiles` -> mismo resultado que `list-scenarios`
-
-Comando avanzado:
+Comandos retirados:
 - `sweep`
+- `list-scenarios`
+- `list-profiles`
+
+`src\train.py` se conserva como wrapper legacy del flujo de entrenamiento actual.
 
 ## Entrenamiento
 
-El entrenamiento normal usa siempre la configuracion base `default`. El usuario elige solo el escenario.
+Modelo actual:
+- identidad: `foundation`
+- checkpoint base: `doom_foundation_agent`
+- TensorBoard run: `Doom_Foundation_Agent`
+- escenario activo hoy: `basic`
 
-Ejemplos:
+Comandos:
 
 ```powershell
-.\.venv\Scripts\python.exe src\cli.py train --scenario deadly_corridor
-.\.venv\Scripts\python.exe src\cli.py train --scenario health_gathering --resume latest
+.\.venv\Scripts\python.exe src\cli.py train --scenario basic
 .\.venv\Scripts\python.exe src\cli.py train --scenario basic --from-scratch
-.\.venv\Scripts\python.exe src\cli.py train --scenario defend_the_center --seed 123
+.\.venv\Scripts\python.exe src\cli.py train --scenario basic --resume latest
 ```
-
-Flags utiles de `train`:
-- `--resume auto|latest|<checkpoint>`
-- `--from-scratch`
-- `--seed <int>`
-- `--timesteps <int>`
-- `--eval-freq <int>`
-- `--eval-episodes <int>`
-- `--no-save-best`
-- `--allow-scenario-resume`
-
-Notas importantes:
-- `RecurrentPPO` entrena en bloques de `n_steps`
-- `effective_timesteps` puede ser mayor que `requested_timesteps`
-- si el escenario no es `basic`, el checkpoint agrega sufijo `__<scenario>`
-- por defecto, una corrida intenta reanudar desde el ultimo checkpoint compatible
 
 ## Evaluacion
 
-Evaluacion normal por escenario:
+Evaluar mejor checkpoint del escenario:
 
 ```powershell
-.\.venv\Scripts\python.exe src\cli.py evaluate --scenario deadly_corridor
+.\.venv\Scripts\python.exe src\cli.py evaluate --scenario basic
 ```
 
 Evaluar checkpoint explicito:
 
 ```powershell
-.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\checkpoints\ppo_doom_recurrent_actions_v2__deadly_corridor.zip
+.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\checkpoints\doom_foundation_agent.zip
 ```
 
-Forzar seleccion:
+Elegir variante:
 
 ```powershell
-.\.venv\Scripts\python.exe src\cli.py evaluate --scenario basic --select last
 .\.venv\Scripts\python.exe src\cli.py evaluate --scenario basic --select best
+.\.venv\Scripts\python.exe src\cli.py evaluate --scenario basic --select last
 ```
 
 Limitar pasos:
@@ -149,43 +131,46 @@ Limitar pasos:
 .\.venv\Scripts\python.exe src\cli.py evaluate --scenario basic --steps 500
 ```
 
-## Sweep
+## Catalogo de escenarios
 
-`sweep` ejecuta varias corridas secuenciales cambiando hiperparametros sobre la configuracion `default`.
-
-Ejemplo:
-
-```powershell
-.\.venv\Scripts\python.exe src\cli.py sweep --scenario basic --learning-rates 0.0001,0.0002 --n-steps-values 1024,2048 --batch-sizes 32,64 --seeds 42,43
-```
-
-## Escenarios Disponibles
-
-- `basic`
-- `defend_the_center`
-- `deadly_corridor`
-- `health_gathering`
-
-Los presets de cada escenario viven en:
+Los presets siguen en:
 
 ```text
-configs/training_profiles.toml
+configs/base.toml
+configs/scenarios/basic.toml
 ```
+
+Se usan para:
+- resolver nombres de checkpoint por escenario
+- conservar metadata y compatibilidad historica
+
+Escenario activo hoy:
+- `basic`
+
+Escenarios futuros recomendados:
+- `defend_the_center`
+- `health_gathering`
+- `take_cover`
+- `deadly_corridor`
+
+La priorizacion detallada vive en [Docs/vizdoom_escenarios_oficiales.md](/E:/agente-doom/Docs/vizdoom_escenarios_oficiales.md:89).
 
 ## Artefactos
 
-Salidas generadas:
+Salidas historicas:
 - `artifacts/checkpoints/`
 - `artifacts/checkpoints/auto/`
+- `artifacts/runs/<run_id>/`
 - `artifacts/reports/`
 - `artifacts/tensorboard/`
 - `artifacts/videos/`
 
-Comportamiento:
-- ultimo estado: `<checkpoint>.zip`
-- mejor modelo por evaluacion: `<checkpoint>_best.zip`
-- metadata estructurada: `<checkpoint>.json`
-- indice de corridas: `artifacts/reports/index.json`
+Convencion local de fase 1:
+- `artifacts/checkpoints/` guarda checkpoint canonico para `resume` y `evaluate`
+- `artifacts/runs/<run_id>/checkpoints/` guarda snapshot inmutable por corrida
+- `artifacts/runs/<run_id>/videos/` guarda videos de esa corrida
+- `artifacts/runs/<run_id>/tensorboard/` guarda logs de esa corrida
+- `artifacts/runs/<run_id>/report.json` guarda reporte detallado
 
 ## Desarrollo
 
@@ -197,9 +182,11 @@ Checks locales:
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Con Makefile:
+Con `make`:
 
 ```powershell
+make setup
+make bootstrap
 make lint
 make typecheck
 make test
@@ -212,35 +199,23 @@ Pre-commit:
 .\.venv\Scripts\python.exe -m pre_commit install
 ```
 
-TensorBoard:
-
-```powershell
-.\.venv\Scripts\tensorboard.exe --logdir artifacts\tensorboard
-```
-
 ## Estructura
 
 ```text
 src\
   doom_agent\
     cli\         CLI unificada
-    config\      carga tipada del catalogo TOML y rutas
-    envs\        entorno Gymnasium, acciones y reward shaping
+    config\      catalogo tipado y rutas
+    envs\        entorno Gymnasium y acciones
     models\      modelo PPO recurrente
-    services\    entrenamiento, evaluacion y sweep
-    shared\      contratos y tipos compartidos
+    services\    entrenamiento, evaluacion y compatibilidad
+    shared\      contratos y tipos
     utils\       checkpoints, reportes y filesystem
   cli.py         entrypoint principal
-  train.py       wrapper legacy
+  train.py       wrapper legacy de entrenamiento
   evaluate.py    wrapper legacy
-configs\         configuracion por escenario
+configs\         catalogo por escenario
 data\scenarios\  escenarios .cfg y .wad
 tests\           pruebas automatizadas
-artifacts\       salidas generadas
+artifacts\       salidas historicas
 ```
-
-## Notas
-
-- `src\train.py` y `src\evaluate.py` siguen existiendo por compatibilidad, pero el entrypoint recomendado es `src\cli.py`
-- `list-profiles` sigue funcionando como alias, pero el nombre recomendado es `list-scenarios`
-- si necesitas cambiar timesteps, reward shaping o frecuencias por escenario, edita `configs/training_profiles.toml`

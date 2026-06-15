@@ -13,50 +13,55 @@ CHECKPOINT ?=
 SELECT ?= best
 STEPS ?=
 LIMIT ?= 20
-LEARNING_RATES ?=
-N_STEPS_VALUES ?=
-BATCH_SIZES ?=
-SEEDS ?=
 EVAL_FREQ ?=
 EVAL_EPISODES ?= 5
 FROM_SCRATCH ?= 0
 ALLOW_SCENARIO_RESUME ?= 0
 NO_SAVE_BEST ?= 0
 
-# Se eliminaron las barras invertidas de continuación para evitar conflictos en PowerShell
 TRAIN_FLAGS = --scenario $(SCENARIO) $(if $(TIMESTEPS),--timesteps $(TIMESTEPS),) $(if $(SEED),--seed $(SEED),) $(if $(RESUME),--resume $(RESUME),) $(if $(EVAL_FREQ),--eval-freq $(EVAL_FREQ),) $(if $(EVAL_EPISODES),--eval-episodes $(EVAL_EPISODES),) $(if $(filter 1 true yes,$(FROM_SCRATCH)),--from-scratch,) $(if $(filter 1 true yes,$(ALLOW_SCENARIO_RESUME)),--allow-scenario-resume,) $(if $(filter 1 true yes,$(NO_SAVE_BEST)),--no-save-best,)
-
 EVALUATE_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT) $(if $(STEPS),--steps $(STEPS),)
-
 INSPECT_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT)
 
-SWEEP_FLAGS = --scenario $(SCENARIO) $(if $(TIMESTEPS),--timesteps $(TIMESTEPS),) $(if $(LEARNING_RATES),--learning-rates $(LEARNING_RATES),) $(if $(N_STEPS_VALUES),--n-steps-values $(N_STEPS_VALUES),) $(if $(BATCH_SIZES),--batch-sizes $(BATCH_SIZES),) $(if $(SEEDS),--seeds $(SEEDS),) $(if $(EVAL_FREQ),--eval-freq $(EVAL_FREQ),) $(if $(EVAL_EPISODES),--eval-episodes $(EVAL_EPISODES),) $(if $(filter 1 true yes,$(NO_SAVE_BEST)),--no-save-best,)
-
-.PHONY: help venv install lint typecheck test check precommit tensorboard \
-	list-scenarios list-profiles list-checkpoints list-runs inspect evaluate \
-	train train-basic train-defend train-deadly train-health sweep
+.PHONY: help venv install setup bootstrap lint typecheck test check precommit \
+	list-checkpoints list-runs inspect evaluate evaluate-last play train train-from-scratch \
+	train-latest tensorboard
 
 help:
 	@echo "Targets principales:"
+	@echo "  make venv               		# crea un entorno virtual en .venv"
 	@echo "  make install            		# instala dependencias en .venv"
+	@echo "  make setup              		# venv + install"
+	@echo "  make bootstrap          		# setup + check"
 	@echo "  make check              		# ruff + mypy + unittest"
-	@echo "  make list-scenarios     		# lista escenarios del flujo normal"
-	@echo "  make train              		# SCENARIO=basic"
-	@echo "  make train-basic"
-	@echo "  make train-defend"
-	@echo "  make train-deadly"
-	@echo "  make train-health"
-	@echo "  make evaluate           		# SCENARIO=deadly_corridor"
-	@echo "  make inspect            		# SCENARIO=health_gathering"
-	@echo "  make sweep              		# SCENARIO=basic LEARNING_RATES=0.0001,0.0002 N_STEPS_VALUES=1024,2048"
+	@echo "  make train              		# entrena en SCENARIO=basic"
+	@echo "  make train-from-scratch 		# entrena desde cero"
+	@echo "  make train-latest       		# fuerza resume latest"
+	@echo "  make evaluate           		# evalua mejor checkpoint visualmente"
+	@echo "  make evaluate-last      		# evalua ultimo checkpoint visualmente"
+	@echo "  make play               		# alias de evaluate"
+	@echo "  make inspect            		# SCENARIO=basic"
+	@echo "  make list-checkpoints   		# LIMIT=20"
+	@echo "  make list-runs         		# LIMIT=20"
+	@echo "  make tensorboard        		# abre TensorBoard en artifacts\\runs"
+	@echo ""
+	@echo "Variables utiles:"
+	@echo "  SCENARIO=basic"
+	@echo "  TIMESTEPS=750000"
+	@echo "  SEED=42"
+	@echo "  STEPS=2000"
+	@echo "  CHECKPOINT=artifacts\\checkpoints\\doom_foundation_agent.zip"
 
-# Se usó "py -m venv" garantizando compatibilidad en Windows
 venv:
 	@py -m venv .venv
 
 install:
 	@& "$(PYTHON)" -m pip install --upgrade pip
 	@& "$(PYTHON)" -m pip install -r requirements.txt
+
+setup: venv install
+
+bootstrap: setup check
 
 lint:
 	@& "$(PYTHON)" -m ruff check .
@@ -73,13 +78,7 @@ precommit:
 	@& "$(PYTHON)" -m pre_commit install
 
 tensorboard:
-	@& "$(TENSORBOARD)" --logdir artifacts\tensorboard
-
-list-scenarios:
-	@& "$(PYTHON)" "$(CLI)" list-scenarios
-
-list-profiles:
-	@& "$(PYTHON)" "$(CLI)" list-profiles
+	@& "$(TENSORBOARD)" --logdir artifacts\runs
 
 list-checkpoints:
 	@& "$(PYTHON)" "$(CLI)" list-checkpoints --limit $(LIMIT)
@@ -90,23 +89,19 @@ list-runs:
 inspect:
 	@& "$(PYTHON)" "$(CLI)" inspect-checkpoint $(INSPECT_FLAGS)
 
-evaluate:
-	@& "$(PYTHON)" "$(CLI)" evaluate $(EVALUATE_FLAGS)
-
 train:
 	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS)
 
-train-basic:
-	@& "$(PYTHON)" "$(CLI)" train --scenario basic
+train-from-scratch:
+	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS) --from-scratch
 
-train-defend:
-	@& "$(PYTHON)" "$(CLI)" train --scenario defend_the_center
+train-latest:
+	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS) --resume latest
 
-train-deadly:
-	@& "$(PYTHON)" "$(CLI)" train --scenario deadly_corridor
+evaluate:
+	@& "$(PYTHON)" "$(CLI)" evaluate $(EVALUATE_FLAGS)
 
-train-health:
-	@& "$(PYTHON)" "$(CLI)" train --scenario health_gathering
+evaluate-last:
+	@& "$(PYTHON)" "$(CLI)" evaluate $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select last $(if $(STEPS),--steps $(STEPS),)
 
-sweep:
-	@& "$(PYTHON)" "$(CLI)" sweep $(SWEEP_FLAGS)
+play: evaluate
