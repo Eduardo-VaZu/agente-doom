@@ -12,8 +12,8 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import VecEnv
 
 from doom_agent.config.schema import TrainingProfile
-from doom_agent.services.early_stopping import EarlyStoppingTracker
 from doom_agent.models import build_recurrent_ppo_model
+from doom_agent.services.early_stopping import EarlyStoppingTracker
 from doom_agent.services.resume import ResumeState
 from doom_agent.shared.contracts import EvaluationMetricsPayload
 from doom_agent.utils.checkpoints import (
@@ -58,11 +58,11 @@ def load_training_model(
 def load_best_mean_reward(best_checkpoint_stem: Path) -> float:
     metadata = load_checkpoint_metadata(best_checkpoint_stem)
     if metadata is None:
-        return -inf
+        return float("-inf")
 
     evaluation_metrics = metadata["evaluation_metrics"]
     if evaluation_metrics is None:
-        return -inf
+        return float("-inf")
 
     return float(evaluation_metrics["mean_reward"])
 

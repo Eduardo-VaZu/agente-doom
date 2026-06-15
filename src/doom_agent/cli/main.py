@@ -5,12 +5,7 @@ import json
 
 from doom_agent.cli.evaluate import add_evaluate_arguments
 from doom_agent.cli.train import add_train_arguments
-from doom_agent.config import (
-    DEFAULT_PROFILE_NAME,
-    SCENARIO_NAMES,
-    build_project_paths,
-    get_training_profile,
-)
+from doom_agent.config import build_project_paths, get_training_profile
 from doom_agent.utils.checkpoints import list_all_checkpoints, resolve_checkpoint_preference
 from doom_agent.utils.reports import list_experiment_runs
 
@@ -19,79 +14,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "CLI unificada para Agente Doom. "
-            "Flujo normal: entrena con 'train --scenario <escenario>'."
+            "Modelo foundation con entrenamiento, evaluacion e inspeccion."
         )
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    train_parser = subparsers.add_parser("train", help="Entrena el agente.")
+    train_parser = subparsers.add_parser("train", help="Entrena modelo foundation.")
     add_train_arguments(train_parser)
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evalua un checkpoint.")
     add_evaluate_arguments(evaluate_parser)
-
-    sweep_parser = subparsers.add_parser("sweep", help="Ejecuta un sweep secuencial.")
-    sweep_parser.add_argument(
-        "--config",
-        choices=(DEFAULT_PROFILE_NAME,),
-        default=DEFAULT_PROFILE_NAME,
-        help="Configuracion base para el sweep. Usa el flujo normal 'default'.",
-    )
-    sweep_parser.add_argument(
-        "--scenario",
-        choices=SCENARIO_NAMES,
-        default=None,
-        help="Escenario base para el sweep.",
-    )
-    sweep_parser.add_argument(
-        "--timesteps",
-        type=int,
-        default=None,
-        help="Sobrescribe los timesteps solicitados para todas las variantes.",
-    )
-    sweep_parser.add_argument(
-        "--learning-rates",
-        default=None,
-        help="Lista CSV de learning rates. Ejemplo: 0.0001,0.0003",
-    )
-    sweep_parser.add_argument(
-        "--n-steps-values",
-        default=None,
-        help="Lista CSV de n_steps. Ejemplo: 256,512",
-    )
-    sweep_parser.add_argument(
-        "--batch-sizes",
-        default=None,
-        help="Lista CSV de batch sizes. Ejemplo: 32,64",
-    )
-    sweep_parser.add_argument(
-        "--seeds",
-        default=None,
-        help="Lista CSV de seeds. Ejemplo: 42,43",
-    )
-    sweep_parser.add_argument(
-        "--eval-freq",
-        type=int,
-        default=None,
-        help="Frecuencia de evaluacion periodica en pasos.",
-    )
-    sweep_parser.add_argument(
-        "--eval-episodes",
-        type=int,
-        default=5,
-        help="Cantidad de episodios por evaluacion periodica.",
-    )
-    sweep_parser.add_argument(
-        "--no-save-best",
-        action="store_true",
-        help="No guardar el mejor modelo por variante.",
-    )
-
-    subparsers.add_parser("list-scenarios", help="Lista escenarios del flujo normal.")
-    subparsers.add_parser(
-        "list-profiles",
-        help="Alias compatible de 'list-scenarios'.",
-    )
 
     list_checkpoints_parser = subparsers.add_parser(
         "list-checkpoints", help="Lista checkpoints conocidos."
@@ -118,23 +50,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     add_evaluate_arguments(inspect_parser)
     return parser
-
-
-def _print_scenarios() -> None:
-    default_profile = get_training_profile(DEFAULT_PROFILE_NAME)
-    print("Configuracion publica:")
-    print(
-        f"- {DEFAULT_PROFILE_NAME}: flujo normal por escenario, seed={default_profile.seed}, "
-        f"render={default_profile.render}, record_video={default_profile.record_video}"
-    )
-
-    print("Escenarios para entrenamiento normal:")
-    for scenario_name in SCENARIO_NAMES:
-        profile = get_training_profile(DEFAULT_PROFILE_NAME, scenario_name=scenario_name)
-        print(
-            f"- {scenario_name}: file={profile.scenario_name}, "
-            f"timesteps={profile.requested_timesteps}, checkpoint={profile.checkpoint_name}"
-        )
 
 
 def _print_checkpoints(limit: int) -> None:
@@ -195,21 +110,8 @@ def _inspect_checkpoint(args: argparse.Namespace) -> None:
     print(json.dumps(checkpoint.metadata, indent=2, sort_keys=True))
 
 
-def _parse_float_csv(values: str | None, fallback: float) -> tuple[float, ...]:
-    if values is None:
-        return (fallback,)
-    return tuple(float(value.strip()) for value in values.split(",") if value.strip())
-
-
-def _parse_int_csv(values: str | None, fallback: int) -> tuple[int, ...]:
-    if values is None:
-        return (fallback,)
-    return tuple(int(value.strip()) for value in values.split(",") if value.strip())
-
-
 def main() -> None:
     from doom_agent.services.evaluator import evaluate
-    from doom_agent.services.sweeps import run_sweep
     from doom_agent.services.trainer import train
 
     parser = _build_parser()
@@ -242,30 +144,6 @@ def main() -> None:
             checkpoint_selection=args.select,
             scenario_name=args.scenario,
         )
-        return
-
-    if args.command == "sweep":
-        base_profile = get_training_profile(
-            profile_name=args.config,
-            requested_timesteps=args.timesteps,
-            scenario_name=args.scenario,
-        )
-        run_sweep(
-            profile_name=args.config,
-            scenario_name=args.scenario,
-            requested_timesteps=args.timesteps,
-            learning_rates=_parse_float_csv(args.learning_rates, base_profile.learning_rate),
-            n_steps_values=_parse_int_csv(args.n_steps_values, base_profile.n_steps),
-            batch_sizes=_parse_int_csv(args.batch_sizes, base_profile.batch_size),
-            seeds=_parse_int_csv(args.seeds, base_profile.seed),
-            eval_frequency=args.eval_freq,
-            eval_episodes=args.eval_episodes,
-            save_best=not args.no_save_best,
-        )
-        return
-
-    if args.command in {"list-profiles", "list-scenarios"}:
-        _print_scenarios()
         return
 
     if args.command == "list-checkpoints":

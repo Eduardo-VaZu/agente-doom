@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -80,6 +81,13 @@ def save_checkpoint_bundle(
 ) -> None:
     model.save(str(checkpoint_stem))
     write_json(checkpoint_metadata_path(checkpoint_stem), metadata)
+
+
+def copy_checkpoint_bundle(source_stem: Path, target_stem: Path) -> None:
+    shutil.copy2(checkpoint_zip_path(source_stem), checkpoint_zip_path(target_stem))
+    source_metadata_path = checkpoint_metadata_path(source_stem)
+    if source_metadata_path.exists():
+        shutil.copy2(source_metadata_path, checkpoint_metadata_path(target_stem))
 
 
 def load_checkpoint_metadata(checkpoint_stem: Path) -> CheckpointMetadataPayload | None:

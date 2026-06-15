@@ -17,7 +17,7 @@ def add_evaluate_arguments(parser: argparse.ArgumentParser) -> argparse.Argument
         default=DEFAULT_PROFILE_NAME,
         help=(
             "Configuracion base para derivar el checkpoint cuando no se pasa '--checkpoint'. "
-            "Flujo normal: omitir esta bandera y usar '--scenario'."
+            "Normalmente basta con usar '--scenario'."
         ),
     )
     parser.add_argument(
@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser = add_evaluate_arguments(
         argparse.ArgumentParser(
             description=(
-                "Evalua checkpoints del flujo normal por escenario. "
+                "Evalua checkpoints por escenario. "
                 "Usa '--scenario' para resolver el checkpoint de 'default' si no indicas otro."
             )
         )

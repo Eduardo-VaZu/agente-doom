@@ -1,0 +1,24 @@
+[defaults]
+scenario_key = "basic"
+render = true
+record_video = true
+checkpoint_name = "doom_foundation_agent"
+tensorboard_run_name = "Doom_Foundation_Agent"
+frame_stack = 4
+screen_width = 84
+screen_height = 84
+seed = 42
+action_space_kind = "button_combinations"
+
+[defaults.reward_shaping]
+scale = 1.0
+offset = 0.0
+
+[defaults.early_stopping]
+enabled = false
+patience_evaluations = 3
+min_evaluations = 2
+min_delta = 0.0
+
+[profiles.default]
+scenario_key = "basic"

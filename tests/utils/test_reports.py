@@ -5,10 +5,11 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
 from doom_agent.shared.contracts import EvaluationMetricsPayload
+from doom_agent.storage import build_run_artifact_paths
 from doom_agent.utils.reports import (
     build_run_id,
     build_training_run_report,
@@ -25,12 +26,14 @@ class ReportTests(unittest.TestCase):
         project_paths = build_project_paths(root_dir=root_dir)
         profile = get_training_profile("default", seed=123)
         run_id = build_run_id(profile)
+        run_artifacts = build_run_artifact_paths(project_paths, run_id)
         report = build_training_run_report(
             run_id=run_id,
             created_at_utc="2026-01-01T00:00:00+00:00",
             profile_name="default",
             run_label="manual:test",
             profile=profile,
+            run_artifacts=run_artifacts,
             checkpoint_path=project_paths.checkpoints_dir / f"{profile.checkpoint_name}.zip",
             best_checkpoint_path=project_paths.checkpoints_dir
             / f"{profile.checkpoint_name}_best.zip",
@@ -62,5 +65,10 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(runs[0]["mean_reward"], 10.0)
             self.assertEqual(runs[0]["run_label"], "manual:test")
             self.assertEqual(runs[0]["seed"], 123)
+            self.assertEqual(
+                runs[0]["checkpoint_archive_path"],
+                str(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
+            )
+            self.assertEqual(report_path, run_artifacts.report_path)
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)

@@ -11,6 +11,7 @@ from doom_agent.shared.contracts import (
     ExperimentIndexPayload,
     TrainingRunReportPayload,
 )
+from doom_agent.storage import RunArtifactPaths
 from doom_agent.utils.filesystem import ensure_directories, read_json, write_json
 
 
@@ -26,6 +27,7 @@ def build_training_run_report(
     profile_name: str,
     run_label: str | None,
     profile: TrainingProfile,
+    run_artifacts: RunArtifactPaths,
     checkpoint_path: Path,
     best_checkpoint_path: Path | None,
     training_status: str,
@@ -51,6 +53,13 @@ def build_training_run_report(
         "best_checkpoint_path": str(best_checkpoint_path)
         if best_checkpoint_path is not None
         else None,
+        "checkpoint_archive_path": str(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
+        "best_checkpoint_archive_path": str(run_artifacts.best_checkpoint_stem.with_suffix(".zip"))
+        if best_checkpoint_path is not None
+        else None,
+        "run_dir": str(run_artifacts.run_dir),
+        "tensorboard_dir": str(run_artifacts.tensorboard_dir),
+        "videos_dir": str(run_artifacts.videos_dir),
         "training_status": training_status,
         "completed": completed,
         "requested_timesteps": profile.requested_timesteps,
@@ -68,7 +77,7 @@ def build_training_run_report(
 
 
 def report_path_for_run(project_paths: ProjectPaths, run_id: str) -> Path:
-    return project_paths.reports_dir / f"{run_id}.json"
+    return project_paths.runs_dir / run_id / "report.json"
 
 
 def build_experiment_index_entry(
@@ -86,6 +95,8 @@ def build_experiment_index_entry(
         "checkpoint_name": report["checkpoint_name"],
         "checkpoint_path": report["checkpoint_path"],
         "best_checkpoint_path": report["best_checkpoint_path"],
+        "checkpoint_archive_path": report["checkpoint_archive_path"],
+        "best_checkpoint_archive_path": report["best_checkpoint_archive_path"],
         "saved_timesteps": report["saved_timesteps"],
         "training_status": report["training_status"],
         "mean_reward": mean_reward,
@@ -105,8 +116,8 @@ def save_training_run_report(
     project_paths: ProjectPaths,
     report: TrainingRunReportPayload,
 ) -> Path:
-    ensure_directories([project_paths.reports_dir])
     report_path = report_path_for_run(project_paths, report["run_id"])
+    ensure_directories([project_paths.reports_dir, report_path.parent])
     write_json(report_path, report)
 
     index = load_experiment_index(project_paths)

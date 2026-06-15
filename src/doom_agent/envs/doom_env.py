@@ -256,7 +256,12 @@ def should_record_video(step: int, frequency: int) -> bool:
     return step == 0 or step % frequency == 0
 
 
-def make_vectorized_env(profile: TrainingProfile, project_paths: ProjectPaths) -> VecEnv:
+def make_vectorized_env(
+    profile: TrainingProfile,
+    project_paths: ProjectPaths,
+    *,
+    video_dir: Path | None = None,
+) -> VecEnv:
     def _build_env() -> DoomEnv:
         game = build_doom_game(profile, project_paths)
         return DoomEnv(
@@ -274,10 +279,11 @@ def make_vectorized_env(profile: TrainingProfile, project_paths: ProjectPaths) -
     env = VecFrameStack(env, n_stack=profile.frame_stack)
 
     if profile.record_video:
-        ensure_directories([project_paths.videos_dir])
+        resolved_video_dir = project_paths.videos_dir if video_dir is None else video_dir
+        ensure_directories([resolved_video_dir])
         env = VecVideoRecorder(
             venv=env,
-            video_folder=str(project_paths.videos_dir),
+            video_folder=str(resolved_video_dir),
             record_video_trigger=lambda step: should_record_video(
                 step, profile.video_record_frequency
             ),

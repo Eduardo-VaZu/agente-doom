@@ -17,9 +17,11 @@ class ProjectPaths:
     root_dir: Path
     config_dir: Path
     training_catalog_path: Path
+    scenario_configs_dir: Path
     data_dir: Path
     scenarios_dir: Path
     artifacts_dir: Path
+    runs_dir: Path
     checkpoints_dir: Path
     auto_checkpoints_dir: Path
     tensorboard_dir: Path
