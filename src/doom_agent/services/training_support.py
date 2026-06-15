@@ -144,6 +144,9 @@ class PeriodicTrainingCallback(BaseCallback):
             "mean_episode_length": mean_length,
             "episodes": self.evaluation_settings.episodes,
         }
+        self.logger.record("eval/mean_reward", mean_reward)
+        self.logger.record("eval/std_reward", std_reward)
+        self.logger.record("eval/mean_episode_length", mean_length)
 
         if self.verbose:
             print_kv_block(
