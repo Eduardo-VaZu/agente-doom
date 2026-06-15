@@ -22,6 +22,7 @@ NO_SAVE_BEST ?= 0
 TRAIN_FLAGS = --scenario $(SCENARIO) $(if $(TIMESTEPS),--timesteps $(TIMESTEPS),) $(if $(SEED),--seed $(SEED),) $(if $(RESUME),--resume $(RESUME),) $(if $(EVAL_FREQ),--eval-freq $(EVAL_FREQ),) $(if $(EVAL_EPISODES),--eval-episodes $(EVAL_EPISODES),) $(if $(filter 1 true yes,$(FROM_SCRATCH)),--from-scratch,) $(if $(filter 1 true yes,$(ALLOW_SCENARIO_RESUME)),--allow-scenario-resume,) $(if $(filter 1 true yes,$(NO_SAVE_BEST)),--no-save-best,)
 EVALUATE_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT) $(if $(STEPS),--steps $(STEPS),)
 INSPECT_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT)
+CANCEL_EXIT_CODES = @(130, 3221225786, -1073741510)
 
 .PHONY: help venv install setup bootstrap lint typecheck test check precommit \
 	list-checkpoints list-runs inspect evaluate evaluate-last play train train-from-scratch \
@@ -78,7 +79,7 @@ precommit:
 	@& "$(PYTHON)" -m pre_commit install
 
 tensorboard:
-	@& "$(TENSORBOARD)" --logdir artifacts\runs
+	@& "$(TENSORBOARD)" --logdir artifacts\runs; if ($$LASTEXITCODE -eq 0) { exit 0 } elseif ($(CANCEL_EXIT_CODES) -contains $$LASTEXITCODE) { Write-Host "TensorBoard detenido por usuario."; exit 0 } else { exit $$LASTEXITCODE }
 
 list-checkpoints:
 	@& "$(PYTHON)" "$(CLI)" list-checkpoints --limit $(LIMIT)
@@ -90,18 +91,18 @@ inspect:
 	@& "$(PYTHON)" "$(CLI)" inspect-checkpoint $(INSPECT_FLAGS)
 
 train:
-	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS)
+	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS); if ($$LASTEXITCODE -eq 0) { exit 0 } elseif ($(CANCEL_EXIT_CODES) -contains $$LASTEXITCODE) { Write-Host "Entrenamiento cancelado por usuario."; exit 0 } else { exit $$LASTEXITCODE }
 
 train-from-scratch:
-	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS) --from-scratch
+	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS) --from-scratch; if ($$LASTEXITCODE -eq 0) { exit 0 } elseif ($(CANCEL_EXIT_CODES) -contains $$LASTEXITCODE) { Write-Host "Entrenamiento cancelado por usuario."; exit 0 } else { exit $$LASTEXITCODE }
 
 train-latest:
-	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS) --resume latest
+	@& "$(PYTHON)" "$(CLI)" train $(TRAIN_FLAGS) --resume latest; if ($$LASTEXITCODE -eq 0) { exit 0 } elseif ($(CANCEL_EXIT_CODES) -contains $$LASTEXITCODE) { Write-Host "Entrenamiento cancelado por usuario."; exit 0 } else { exit $$LASTEXITCODE }
 
 evaluate:
-	@& "$(PYTHON)" "$(CLI)" evaluate $(EVALUATE_FLAGS)
+	@& "$(PYTHON)" "$(CLI)" evaluate $(EVALUATE_FLAGS); if ($$LASTEXITCODE -eq 0) { exit 0 } elseif ($(CANCEL_EXIT_CODES) -contains $$LASTEXITCODE) { Write-Host "Evaluacion cancelada por usuario."; exit 0 } else { exit $$LASTEXITCODE }
 
 evaluate-last:
-	@& "$(PYTHON)" "$(CLI)" evaluate $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select last $(if $(STEPS),--steps $(STEPS),)
+	@& "$(PYTHON)" "$(CLI)" evaluate $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select last $(if $(STEPS),--steps $(STEPS),); if ($$LASTEXITCODE -eq 0) { exit 0 } elseif ($(CANCEL_EXIT_CODES) -contains $$LASTEXITCODE) { Write-Host "Evaluacion cancelada por usuario."; exit 0 } else { exit $$LASTEXITCODE }
 
 play: evaluate
