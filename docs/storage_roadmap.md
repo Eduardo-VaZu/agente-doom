@@ -71,6 +71,7 @@ Convencion aplicada:
 - snapshot historico por corrida vive en `artifacts/runs/<run_id>/checkpoints/`
 - TensorBoard y videos se separan por corrida dentro de `artifacts/runs/<run_id>/`
 - `artifacts/reports/index.json` sigue como indice resumido local
+- lectura de JSON local ya es tolerante a BOM UTF-8 para compatibilidad con archivos legacy de Windows
 
 ## Fase 2: Arquitectura hibrida
 

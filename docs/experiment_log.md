@@ -26,11 +26,18 @@ Cada entrada debe incluir:
   - `Makefile` reactivado con `make train`
   - tests reorganizados por area
   - `Docs/` reorganizado como sistema de referencia + seguimiento
+  - storage local por corrida implementado en `artifacts/runs/<run_id>/`
+  - consola de entrenamiento mejorada con bloques visuales
+  - cancelacion limpia por `Ctrl+C` aplicada a comandos largos de `make`
+  - fix de compatibilidad BOM para `make list-runs`
 - comando ejecutado:
-  - no se registro una corrida larga de entrenamiento en esta entrada
+  - `make check`
+  - `make list-runs`
 - resultado observado:
   - arquitectura lista para comenzar iteracion operativa sobre `basic`
+  - validacion automatica estable
+  - operacion diaria mas clara para entrenamiento, evaluacion y seguimiento
 - decision siguiente:
-  - correr `make check`
-  - correr `make train`
+  - correr `make train-from-scratch`
+  - observar TensorBoard y consola visual
   - registrar comportamiento real del entrenamiento
