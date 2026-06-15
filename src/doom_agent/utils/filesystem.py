@@ -16,4 +16,4 @@ def write_json(path: Path, payload: Mapping[str, object]) -> None:
 
 
 def read_json(path: Path) -> dict[str, object]:
-    return cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
+    return cast(dict[str, object], json.loads(path.read_text(encoding="utf-8-sig")))

@@ -22,6 +22,8 @@ from doom_agent.utils.checkpoints import (
     load_checkpoint_metadata,
     save_checkpoint_bundle,
 )
+from doom_agent.utils.console import print_block, print_kv_block
+from doom_agent.utils.formatting import format_path_tail
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,10 +146,16 @@ class PeriodicTrainingCallback(BaseCallback):
         }
 
         if self.verbose:
-            print(
-                "Evaluacion periodica: "
-                f"mean_reward={mean_reward:.3f}, std_reward={std_reward:.3f}, "
-                f"mean_length={mean_length:.1f}."
+            print_kv_block(
+                "Evaluation",
+                [
+                    ("step", self.num_timesteps),
+                    ("mean_reward", mean_reward),
+                    ("std_reward", std_reward),
+                    ("mean_length", mean_length),
+                    ("episodes", self.evaluation_settings.episodes),
+                    ("best_reward", self.best_mean_reward),
+                ],
             )
         self._print_action_usage()
 
@@ -155,7 +163,7 @@ class PeriodicTrainingCallback(BaseCallback):
         self.best_mean_reward = self.early_stopping.best_mean_reward
 
         if self.verbose and self.early_stopping.stopped and self.early_stopping.stop_reason:
-            print(self.early_stopping.stop_reason)
+            print_block("Early Stopping", [self.early_stopping.stop_reason])
 
         if self.evaluation_settings.save_best and improved:
             self.best_mean_reward = mean_reward
@@ -175,9 +183,17 @@ class PeriodicTrainingCallback(BaseCallback):
                 metadata,
             )
             if self.verbose:
-                print(
-                    "Nuevo mejor modelo guardado en "
-                    f"{self.evaluation_settings.best_checkpoint_stem.with_suffix('.zip')}"
+                print_kv_block(
+                    "Best Model",
+                    [
+                        ("step", self.num_timesteps),
+                        (
+                            "path",
+                            format_path_tail(
+                                self.evaluation_settings.best_checkpoint_stem.with_suffix(".zip")
+                            ),
+                        ),
+                    ],
                 )
 
     def _save_periodic_checkpoint(self) -> None:
@@ -195,7 +211,13 @@ class PeriodicTrainingCallback(BaseCallback):
         )
         save_checkpoint_bundle(self.model, checkpoint_stem, metadata)
         if self.verbose:
-            print(f"Checkpoint guardado en {checkpoint_stem.with_suffix('.zip')}")
+            print_kv_block(
+                "Checkpoint",
+                [
+                    ("step", self.num_timesteps),
+                    ("path", format_path_tail(checkpoint_stem.with_suffix(".zip"))),
+                ],
+            )
         self._print_action_usage()
 
     def _load_action_labels(self) -> tuple[str, ...]:
@@ -237,5 +259,5 @@ class PeriodicTrainingCallback(BaseCallback):
             percentage = (count / total) * 100
             top_actions.append(f"{label}={count} ({percentage:.1f}%)")
 
-        print("Acciones recientes: " + ", ".join(top_actions))
+        print_block("Recent Actions", top_actions)
         self.action_counts.clear()
