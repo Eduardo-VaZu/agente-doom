@@ -21,7 +21,9 @@ from doom_agent.utils.checkpoints import (
     copy_checkpoint_bundle,
     save_checkpoint_bundle,
 )
+from doom_agent.utils.console import print_block, print_kv_block
 from doom_agent.utils.filesystem import ensure_directories
+from doom_agent.utils.formatting import format_path_tail
 from doom_agent.utils.reports import (
     build_run_id,
     build_training_run_report,
@@ -76,58 +78,76 @@ def print_training_summary(
     evaluation_settings: EvaluationSettings,
     run_label: str | None = None,
 ) -> None:
+    title = f"Training Start | {profile_name}"
     if run_label:
-        print(f"Iniciando entrenamiento '{profile_name}' ({run_label}) en {profile.scenario_name}.")
-    else:
-        print(f"Iniciando entrenamiento '{profile_name}' en {profile.scenario_name}.")
-    print(f"Seed: {profile.seed}.")
-    if profile.scenario_description:
-        print(f"Escenario '{profile.scenario_key}': {profile.scenario_description}")
-    print(f"Acciones: {profile.action_space_kind} con {profile.frame_stack} frames apilados.")
-    print(
-        "Reward shaping: "
-        f"scale={profile.reward_shaping.scale}, "
-        f"offset={profile.reward_shaping.offset}, "
-        f"clip_min={profile.reward_shaping.clip_min}, "
-        f"clip_max={profile.reward_shaping.clip_max}."
+        title = f"{title} | {run_label}"
+    print_kv_block(
+        title,
+        [
+            ("scenario", profile.scenario_key),
+            ("scenario_file", profile.scenario_name),
+            ("seed", profile.seed),
+            ("action_space", profile.action_space_kind),
+            ("frame_stack", profile.frame_stack),
+            ("requested_steps", profile.requested_timesteps),
+            ("effective_steps", profile.effective_timesteps),
+            ("checkpoint_every", profile.checkpoint_frequency),
+            ("eval_every", evaluation_settings.frequency),
+            ("eval_episodes", evaluation_settings.episodes),
+        ],
     )
-    print(f"Timesteps solicitados para esta ejecucion: {profile.requested_timesteps}.")
-    print(f"Timesteps efectivos de esta ejecucion: {profile.effective_timesteps}.")
+    if profile.scenario_description:
+        print_block("Scenario", [profile.scenario_description])
+    print_kv_block(
+        "Reward Shaping",
+        [
+            ("scale", profile.reward_shaping.scale),
+            ("offset", profile.reward_shaping.offset),
+            ("clip_min", profile.reward_shaping.clip_min),
+            ("clip_max", profile.reward_shaping.clip_max),
+        ],
+    )
     if profile.uses_rounded_timesteps:
-        print(
-            "Stable-Baselines3 redondea al siguiente multiplo de "
-            f"n_steps={profile.n_steps}; por eso se ejecutaran "
-            f"{profile.effective_timesteps} pasos."
+        print_block(
+            "Timesteps Note",
+            [
+                "Stable-Baselines3 redondea al siguiente multiplo de n_steps.",
+                f"n_steps={profile.n_steps} -> se ejecutaran {profile.effective_timesteps} pasos.",
+            ],
         )
 
     if resume_state.is_resumed:
-        print(
-            "Reanudando desde "
-            f"{resume_state.resume_source} con {resume_state.resume_saved_timesteps} pasos acumulados."
-        )
+        resume_lines = [
+            f"mode={resume_state.mode}",
+            f"source={resume_state.resume_source}",
+            f"saved_steps={resume_state.resume_saved_timesteps}",
+        ]
         if resume_state.note:
-            print(resume_state.note)
+            resume_lines.append(resume_state.note)
+        print_block("Resume", resume_lines)
     else:
         if resume_state.mode == "from_scratch":
-            print("Entrenamiento forzado desde cero.")
+            print_block("Resume", ["Entrenamiento forzado desde cero."])
         elif resume_state.mode == AUTO_RESUME_MODE:
-            print("No se encontro checkpoint compatible. El entrenamiento comienza desde cero.")
+            print_block("Resume", ["No se encontro checkpoint compatible. El entrenamiento comienza desde cero."])
         else:
-            print("Entrenamiento comenzando desde cero.")
+            print_block("Resume", ["Entrenamiento comenzando desde cero."])
 
-    print(
-        f"Checkpoints automaticos cada {profile.checkpoint_frequency} pasos en {checkpoints_dir}."
-    )
-    print(
-        f"Evaluacion periodica cada {evaluation_settings.frequency} pasos "
-        f"durante {evaluation_settings.episodes} episodios."
+    print_kv_block(
+        "Artifacts",
+        [
+            ("auto_checkpoints", format_path_tail(checkpoints_dir)),
+        ],
     )
     if profile.early_stopping.enabled:
-        print(
-            "Early stopping activo: "
-            f"patience={profile.early_stopping.patience_evaluations}, "
-            f"min_evaluations={profile.early_stopping.min_evaluations}, "
-            f"min_delta={profile.early_stopping.min_delta}."
+        print_kv_block(
+            "Early Stopping",
+            [
+                ("enabled", profile.early_stopping.enabled),
+                ("patience", profile.early_stopping.patience_evaluations),
+                ("min_evals", profile.early_stopping.min_evaluations),
+                ("min_delta", profile.early_stopping.min_delta),
+            ],
         )
 
 
@@ -238,10 +258,10 @@ def train_profile(
         if callback.early_stopping.stopped:
             training_status = "early_stopped"
     except KeyboardInterrupt:
-        print("Entrenamiento interrumpido por el usuario. Guardando progreso...")
+        print_block("Training Interrupted", ["Entrenamiento interrumpido por usuario.", "Guardando progreso..."])
         training_status = "keyboard_interrupt"
     except ViZDoomUnexpectedExitException:
-        print("Entrenamiento detenido: ViZDoom se cerro. Guardando progreso...")
+        print_block("Training Interrupted", ["ViZDoom se cerro.", "Guardando progreso..."])
         training_status = "vizdoom_exit"
     finally:
         duration_seconds = perf_counter() - started_at
@@ -294,17 +314,17 @@ def train_profile(
         )
         report_path = save_training_run_report(project_paths, report)
 
-        if training_status == "early_stopped":
-            print(f"Entrenamiento detenido anticipadamente. Modelo guardado en {final_checkpoint_stem.with_suffix('.zip')}")
-            if callback.early_stopping.stop_reason is not None:
-                print(callback.early_stopping.stop_reason)
-        elif completed:
-            print(
-                f"Entrenamiento completado. Modelo guardado en {final_checkpoint_stem.with_suffix('.zip')}"
-            )
-        else:
-            print(f"Progreso guardado en {final_checkpoint_stem.with_suffix('.zip')}")
-        print(f"Reporte de entrenamiento guardado en {report_path}")
+        print_kv_block(
+            "Training Result",
+            [
+                ("status", training_status),
+                ("saved_steps", model.num_timesteps),
+                ("model", format_path_tail(final_checkpoint_stem.with_suffix(".zip"))),
+                ("report", format_path_tail(report_path)),
+            ],
+        )
+        if training_status == "early_stopped" and callback.early_stopping.stop_reason is not None:
+            print_block("Stop Reason", [callback.early_stopping.stop_reason])
     if report_path is None:
         raise RuntimeError("No se pudo guardar el reporte de entrenamiento.")
     return TrainingExecutionResult(
