@@ -26,7 +26,7 @@ CANCEL_EXIT_CODES = @(130, 3221225786, -1073741510)
 
 .PHONY: help venv install setup bootstrap lint typecheck test check precommit \
 	list-checkpoints list-runs inspect evaluate evaluate-last play train train-from-scratch \
-	train-latest tensorboard
+	train-latest tensorboard minio-up minio-down minio-logs
 
 help:
 	@echo "Targets principales:"
@@ -45,6 +45,9 @@ help:
 	@echo "  make list-checkpoints   		# LIMIT=20"
 	@echo "  make list-runs         		# LIMIT=20"
 	@echo "  make tensorboard        		# abre TensorBoard en artifacts\\runs"
+	@echo "  make minio-up          		# levanta MinIO local en Docker"
+	@echo "  make minio-down        		# detiene MinIO local"
+	@echo "  make minio-logs        		# muestra logs de MinIO local"
 	@echo ""
 	@echo "Variables utiles:"
 	@echo "  SCENARIO=basic"
@@ -54,7 +57,7 @@ help:
 	@echo "  CHECKPOINT=artifacts\\checkpoints\\doom_foundation_agent.zip"
 
 venv:
-	@py -m venv .venv
+	@py -3.13 -m venv .venv
 
 install:
 	@& "$(PYTHON)" -m pip install --upgrade pip
@@ -80,6 +83,15 @@ precommit:
 
 tensorboard:
 	@& "$(TENSORBOARD)" --logdir artifacts\runs; if ($$LASTEXITCODE -eq 0) { exit 0 } elseif ($(CANCEL_EXIT_CODES) -contains $$LASTEXITCODE) { Write-Host "TensorBoard detenido por usuario."; exit 0 } else { exit $$LASTEXITCODE }
+
+minio-up:
+	@docker compose up -d minio
+
+minio-down:
+	@docker compose down
+
+minio-logs:
+	@docker compose logs -f minio
 
 list-checkpoints:
 	@& "$(PYTHON)" "$(CLI)" list-checkpoints --limit $(LIMIT)

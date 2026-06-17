@@ -12,8 +12,11 @@ from doom_agent.config import (
     materialize_curriculum_profiles,
 )
 from doom_agent.config.schema import TrainingProfile
+from doom_agent.persistence import has_explicit_database_url
+from doom_agent.persistence.repositories import TrainingRunRepository
 from doom_agent.services.resume import AUTO_RESUME_MODE
-from doom_agent.storage import build_run_artifact_paths
+from doom_agent.shared.contracts import TrainingRunReportPayload
+from doom_agent.storage import build_run_artifact_paths, has_explicit_remote_storage_config
 from doom_agent.utils.checkpoints import (
     best_checkpoint_stem,
     build_checkpoint_metadata,
@@ -34,6 +37,7 @@ if TYPE_CHECKING:
     from doom_agent.services.resume import ResumeState
     from doom_agent.services.training_support import EvaluationSettings
 
+
 def _resolve_vizdoom_exit_exception() -> type[Exception]:
     try:
         from vizdoom import ViZDoomUnexpectedExitException as resolved_exception
@@ -47,6 +51,77 @@ def _resolve_vizdoom_exit_exception() -> type[Exception]:
 
 
 ViZDoomUnexpectedExitException = _resolve_vizdoom_exit_exception()
+
+
+def _persist_run_report_to_database(
+    report: TrainingRunReportPayload,
+    report_path: Path,
+) -> None:
+    if not has_explicit_database_url():
+        return
+
+    try:
+        TrainingRunRepository().upsert_run_report(report, report_path=report_path)
+    except Exception as error:
+        print_block(
+            "Persistence Warning",
+            [
+                "No se pudo guardar metadata en PostgreSQL.",
+                f"error={type(error).__name__}: {error}",
+                "Reporte local sigue disponible.",
+            ],
+        )
+
+
+def _sync_run_artifacts_to_remote(run_id: str) -> None:
+    if not has_explicit_remote_storage_config():
+        return
+
+    from doom_agent.services.sync import ArtifactSyncService
+
+    try:
+        result = ArtifactSyncService().sync_run(run_id)
+    except Exception as error:
+        print_block(
+            "Sync Warning",
+            [
+                "No se pudo sincronizar artefactos con MinIO.",
+                f"error={type(error).__name__}: {error}",
+                "Artefactos locales siguen disponibles.",
+            ],
+        )
+        return
+
+    if result.attempted_count == 0:
+        return
+    print_kv_block(
+        "Artifact Sync",
+        [
+            ("run_id", run_id),
+            ("attempted", result.attempted_count),
+            ("synced", result.synced_count),
+            ("failed", result.failed_count),
+            ("status", result.final_status),
+        ],
+    )
+
+
+def copy_run_best_checkpoint_if_updated(
+    final_checkpoint_stem: Path,
+    run_best_checkpoint_stem: Path,
+    *,
+    best_checkpoint_updated: bool,
+) -> Path | None:
+    if not best_checkpoint_updated:
+        return None
+
+    current_best_checkpoint_stem = best_checkpoint_stem(final_checkpoint_stem)
+    current_best_checkpoint_path = checkpoint_zip_path(current_best_checkpoint_stem)
+    if not current_best_checkpoint_path.exists():
+        return None
+
+    copy_checkpoint_bundle(current_best_checkpoint_stem, run_best_checkpoint_stem)
+    return current_best_checkpoint_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,12 +361,11 @@ def train_profile(
         except ViZDoomUnexpectedExitException:
             pass
 
-        best_checkpoint_path = checkpoint_zip_path(best_checkpoint_stem(final_checkpoint_stem))
-        if best_checkpoint_path.exists():
-            copy_checkpoint_bundle(
-                best_checkpoint_stem(final_checkpoint_stem),
-                run_artifacts.best_checkpoint_stem,
-            )
+        best_checkpoint_path = copy_run_best_checkpoint_if_updated(
+            final_checkpoint_stem,
+            run_artifacts.best_checkpoint_stem,
+            best_checkpoint_updated=callback.best_checkpoint_updated,
+        )
         report = build_training_run_report(
             run_id=run_id,
             created_at_utc=run_created_at.isoformat(),
@@ -300,7 +374,7 @@ def train_profile(
             profile=profile,
             run_artifacts=run_artifacts,
             checkpoint_path=final_checkpoint_path,
-            best_checkpoint_path=best_checkpoint_path if best_checkpoint_path.exists() else None,
+            best_checkpoint_path=best_checkpoint_path,
             training_status=training_status,
             completed=completed,
             saved_timesteps=model.num_timesteps,
@@ -313,6 +387,8 @@ def train_profile(
             stop_reason=callback.early_stopping.stop_reason,
         )
         report_path = save_training_run_report(project_paths, report)
+        _persist_run_report_to_database(report, report_path)
+        _sync_run_artifacts_to_remote(run_id)
 
         print_kv_block(
             "Training Result",

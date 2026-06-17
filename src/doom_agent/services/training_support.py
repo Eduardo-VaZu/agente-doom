@@ -95,6 +95,7 @@ class PeriodicTrainingCallback(BaseCallback):
             config=profile.early_stopping,
             best_mean_reward=self.best_mean_reward,
         )
+        self.best_checkpoint_updated = False
         self.last_evaluation_metrics: EvaluationMetricsPayload | None = None
         self.action_counts: Counter[int] = Counter()
         self.action_labels: tuple[str, ...] = ()
@@ -170,6 +171,7 @@ class PeriodicTrainingCallback(BaseCallback):
 
         if self.evaluation_settings.save_best and improved:
             self.best_mean_reward = mean_reward
+            self.best_checkpoint_updated = True
             metadata = build_checkpoint_metadata(
                 profile_name=self.profile_name,
                 profile=self.profile,

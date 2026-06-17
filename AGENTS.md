@@ -2,7 +2,7 @@
 
 ## Platform & Setup
 
-- **Windows x64, Python 3.12**. Use `py` launcher.
+- **Windows x64, Python 3.13**. Use `py` launcher.
 - Venv lives at `.venv`.
 - Main command prefix: `.\.venv\Scripts\python.exe`
 

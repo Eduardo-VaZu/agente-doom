@@ -9,7 +9,11 @@ from typing import cast
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
-from doom_agent.services.trainer import TrainingExecutionResult, select_resume_checkpoint_path
+from doom_agent.services.trainer import (
+    TrainingExecutionResult,
+    copy_run_best_checkpoint_if_updated,
+    select_resume_checkpoint_path,
+)
 from doom_agent.shared.contracts import CheckpointMetadataPayload, EvaluationMetricsPayload
 from doom_agent.utils.checkpoints import (
     build_checkpoint_metadata,
@@ -163,5 +167,32 @@ class CheckpointTests(unittest.TestCase):
             )
 
             self.assertEqual(select_resume_checkpoint_path(result), best_checkpoint_path)
+        finally:
+            shutil.rmtree(root_dir, ignore_errors=True)
+
+    def test_copy_run_best_checkpoint_if_updated_skips_legacy_best_checkpoint(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "skip-legacy-best-checkpoint"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        checkpoint_dir = root_dir / "checkpoints"
+        run_checkpoint_dir = root_dir / "run-checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        run_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        final_checkpoint_stem = checkpoint_dir / "stage"
+        legacy_best_checkpoint_stem = checkpoint_dir / "stage_best"
+        run_best_checkpoint_stem = run_checkpoint_dir / "best_model"
+
+        checkpoint_zip_path(legacy_best_checkpoint_stem).write_text("best", encoding="utf-8")
+        checkpoint_metadata_path(legacy_best_checkpoint_stem).write_text("{}", encoding="utf-8")
+
+        try:
+            copied_path = copy_run_best_checkpoint_if_updated(
+                final_checkpoint_stem,
+                run_best_checkpoint_stem,
+                best_checkpoint_updated=False,
+            )
+
+            self.assertIsNone(copied_path)
+            self.assertFalse(checkpoint_zip_path(run_best_checkpoint_stem).exists())
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)

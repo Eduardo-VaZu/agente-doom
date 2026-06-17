@@ -2,10 +2,10 @@
 name = "agente-doom"
 version = "0.1.0"
 description = "Proyecto de aprendizaje por refuerzo con ViZDoom y RecurrentPPO."
-requires-python = ">=3.12"
+requires-python = ">=3.13,<3.14"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 files = ["src", "tests"]
 mypy_path = "src"
 explicit_package_bases = true
@@ -29,14 +29,29 @@ module = ["tests", "tests.*", "config", "environment", "model", "train", "evalua
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["cv2", "vizdoom", "sb3_contrib", "sb3_contrib.*", "stable_baselines3", "stable_baselines3.*"]
+module = [
+    "cv2",
+    "boto3",
+    "boto3.*",
+    "minio",
+    "minio.*",
+    "vizdoom",
+    "sb3_contrib",
+    "sb3_contrib.*",
+    "stable_baselines3",
+    "stable_baselines3.*",
+]
 ignore_missing_imports = true
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 line-length = 100
 src = ["src", "tests"]
+exclude = [".agents"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 ignore = ["E501", "UP040"]
+
+[tool.ruff.lint.per-file-ignores]
+"migrations/versions/*.py" = ["I001"]

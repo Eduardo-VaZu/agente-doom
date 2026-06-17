@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import cast
 
 from doom_agent.config.schema import ProjectPaths, TrainingProfile
+from doom_agent.persistence import has_explicit_database_url
+from doom_agent.persistence.repositories import TrainingRunRepository
 from doom_agent.shared.contracts import (
     EvaluationMetricsPayload,
     ExperimentIndexEntryPayload,
@@ -129,4 +131,9 @@ def save_training_run_report(
 
 
 def list_experiment_runs(project_paths: ProjectPaths) -> list[ExperimentIndexEntryPayload]:
+    if has_explicit_database_url():
+        try:
+            return TrainingRunRepository().list_run_entries()
+        except Exception:
+            pass
     return load_experiment_index(project_paths)["runs"]

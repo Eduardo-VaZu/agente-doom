@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
@@ -16,6 +18,28 @@ from doom_agent.config import (
     load_training_catalog,
 )
 from doom_agent.config.schema import RewardShapingConfig
+from doom_agent.persistence.config import (
+    DATABASE_URL_ENV_VAR,
+    get_database_url,
+    load_env_file,
+)
+from doom_agent.storage.config import (
+    DEFAULT_STORAGE_BACKEND,
+    MINIO_ACCESS_KEY_ENV_VAR,
+    MINIO_BUCKET_ENV_VAR,
+    MINIO_ENDPOINT_ENV_VAR,
+    MINIO_SECRET_KEY_ENV_VAR,
+    MINIO_SECURE_ENV_VAR,
+    S3_ACCESS_KEY_ID_ENV_VAR,
+    S3_BUCKET_ENV_VAR,
+    S3_REGION_ENV_VAR,
+    S3_SECRET_ACCESS_KEY_ENV_VAR,
+    get_minio_settings,
+    get_s3_settings,
+    get_storage_backend,
+    has_explicit_minio_config,
+    has_explicit_s3_config,
+)
 
 
 class TrainingProfileTests(unittest.TestCase):
@@ -80,3 +104,161 @@ class TrainingProfileTests(unittest.TestCase):
         for scenario_name in SCENARIO_NAMES:
             with self.subTest(scenario=scenario_name):
                 get_training_profile("default", scenario_name=scenario_name).validate(project_paths)
+
+    def test_database_url_can_be_loaded_from_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / ".env"
+            env_path.write_text(
+                'AGENTE_DOOM_DATABASE_URL="postgresql+psycopg://user:pass@host/db?sslmode=require"\n',
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {}, clear=True):
+                load_env_file(env_path)
+                self.assertEqual(
+                    get_database_url(),
+                    "postgresql+psycopg://user:pass@host/db?sslmode=require",
+                )
+
+    def test_database_url_prefers_real_environment_over_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / ".env"
+            env_path.write_text(
+                'AGENTE_DOOM_DATABASE_URL="postgresql+psycopg://file:user@host/db?sslmode=require"\n',
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {DATABASE_URL_ENV_VAR: "postgresql+psycopg://env:user@host/db?sslmode=require"},
+                clear=True,
+            ):
+                load_env_file(env_path)
+                self.assertEqual(
+                    get_database_url(),
+                    "postgresql+psycopg://env:user@host/db?sslmode=require",
+                )
+
+    def test_minio_settings_can_be_loaded_from_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        'AGENTE_DOOM_MINIO_ENDPOINT="http://127.0.0.1:9000"',
+                        'AGENTE_DOOM_MINIO_ACCESS_KEY="minio"',
+                        'AGENTE_DOOM_MINIO_SECRET_KEY="minioadmin"',
+                        'AGENTE_DOOM_MINIO_BUCKET="agente-doom-artifacts"',
+                        'AGENTE_DOOM_MINIO_SECURE="false"',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {}, clear=True):
+                load_env_file(env_path)
+                self.assertTrue(has_explicit_minio_config())
+                settings = get_minio_settings()
+                self.assertEqual(settings.endpoint, "127.0.0.1:9000")
+                self.assertFalse(settings.secure)
+                self.assertEqual(settings.bucket_name, "agente-doom-artifacts")
+
+    def test_minio_settings_prefer_real_environment_over_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        'AGENTE_DOOM_MINIO_ENDPOINT="http://127.0.0.1:9000"',
+                        'AGENTE_DOOM_MINIO_ACCESS_KEY="file-user"',
+                        'AGENTE_DOOM_MINIO_SECRET_KEY="file-pass"',
+                        'AGENTE_DOOM_MINIO_BUCKET="file-bucket"',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    MINIO_ENDPOINT_ENV_VAR: "https://minio.example.com",
+                    MINIO_ACCESS_KEY_ENV_VAR: "env-user",
+                    MINIO_SECRET_KEY_ENV_VAR: "env-pass",
+                    MINIO_BUCKET_ENV_VAR: "env-bucket",
+                    MINIO_SECURE_ENV_VAR: "true",
+                },
+                clear=True,
+            ):
+                load_env_file(env_path)
+                settings = get_minio_settings()
+                self.assertEqual(settings.endpoint, "minio.example.com")
+                self.assertTrue(settings.secure)
+                self.assertEqual(settings.access_key, "env-user")
+                self.assertEqual(settings.bucket_name, "env-bucket")
+
+    def test_storage_backend_defaults_to_minio(self) -> None:
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("doom_agent.storage.config.load_env_file", return_value=None),
+        ):
+            self.assertEqual(get_storage_backend(), DEFAULT_STORAGE_BACKEND)
+
+    def test_s3_settings_can_be_loaded_from_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        'AGENTE_DOOM_STORAGE_BACKEND="s3"',
+                        'AGENTE_DOOM_S3_BUCKET="agente-doom-artifacts-prod"',
+                        'AGENTE_DOOM_S3_REGION="us-east-1"',
+                        'AGENTE_DOOM_S3_ACCESS_KEY_ID="AKIAEXAMPLE"',
+                        'AGENTE_DOOM_S3_SECRET_ACCESS_KEY="secret-example"',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {}, clear=True):
+                load_env_file(env_path)
+                self.assertEqual(get_storage_backend(), "s3")
+                self.assertTrue(has_explicit_s3_config())
+                settings = get_s3_settings()
+                self.assertEqual(settings.bucket_name, "agente-doom-artifacts-prod")
+                self.assertEqual(settings.region, "us-east-1")
+                self.assertEqual(settings.object_prefix, "runs")
+
+    def test_s3_settings_prefer_real_environment_over_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        'AGENTE_DOOM_STORAGE_BACKEND="s3"',
+                        'AGENTE_DOOM_S3_BUCKET="file-bucket"',
+                        'AGENTE_DOOM_S3_REGION="us-east-1"',
+                        'AGENTE_DOOM_S3_ACCESS_KEY_ID="file-access-key"',
+                        'AGENTE_DOOM_S3_SECRET_ACCESS_KEY="file-secret"',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    S3_BUCKET_ENV_VAR: "env-bucket",
+                    S3_REGION_ENV_VAR: "us-east-1",
+                    S3_ACCESS_KEY_ID_ENV_VAR: "env-access-key",
+                    S3_SECRET_ACCESS_KEY_ENV_VAR: "env-secret",
+                },
+                clear=True,
+            ):
+                load_env_file(env_path)
+                settings = get_s3_settings()
+                self.assertEqual(settings.bucket_name, "env-bucket")
+                self.assertEqual(settings.access_key_id, "env-access-key")
