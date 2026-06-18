@@ -24,8 +24,8 @@ Convencion correcta:
 ## Fase 1: Local estable
 
 Estado:
-- activa
-- implementada para almacenamiento local por corrida
+- completa
+- implementada y validada como base local-first por corrida
 
 Objetivo:
 - trabajar solo en local
@@ -76,7 +76,7 @@ Convencion aplicada:
 ## Fase 2: Arquitectura hibrida
 
 Estado:
-- pendiente
+- completa en su base operativa
 
 Objetivo:
 - mantener entrenamiento local
@@ -110,10 +110,31 @@ Entregables:
 - primer backend remoto
 - primer schema de DB
 
+Implementado hoy:
+
+- `training_runs`, `run_artifacts`, `sync_events` en `PostgreSQL`
+- `Neon` como metadata store remoto
+- `AWS S3` como object storage remoto principal
+- `MinIO` local opcional para pruebas
+- escritura local primero, sync remoto despues
+- `list-runs` preferiendo DB con fallback a JSON local
+- sync validado para:
+  - `final checkpoint`
+  - `video`
+  - `best checkpoint` cuando exista realmente en la corrida
+
+Decisiones aplicadas:
+
+- `report.json` sigue local
+- metadata y estados de sync viven en DB
+- checkpoints y videos viven local + remoto
+- si sync falla, entrenamiento no cae
+- backend remoto se selecciona por `AGENTE_DOOM_STORAGE_BACKEND=minio|s3`
+
 ## Fase 3: Operacion remota estable
 
 Estado:
-- pendiente
+- en progreso
 
 Objetivo:
 - dejar flujo estable para entrenamientos recurrentes
@@ -125,6 +146,14 @@ Resultado esperado:
 - metadata en DB
 - corridas listables por escenario, fase y fecha
 - posibilidad de reanudar entrenamientos desde artefactos remotos
+
+Pendiente para considerar esta fase completa:
+
+- comando manual de resincronizacion de artefactos
+- migracion de corridas antiguas `local_only`
+- descarga o restauracion desde `S3`
+- politica operativa clara para `best checkpoint` y reintentos
+- criterio de limpieza o lifecycle para artefactos remotos
 
 ## Fase 4: Tracking avanzado
 
@@ -174,11 +203,13 @@ Esto serviria para:
 
 Actualmente:
 
-- seguir en `Fase 1`
-- no mover nada a nube todavia
-- estabilizar guardado local y entrenamiento en `basic`
+- mantener arquitectura hibrida actual
+- estabilizar entrenamiento largo de `basic`
+- usar `Neon + AWS S3` como camino principal
+- usar `MinIO` solo para pruebas locales si hace falta
 
 Despues:
 
-- preparar contrato de almacenamiento remoto
-- preparar schema inicial para metadata
+- agregar comando de `resync`
+- definir operacion de limpieza y migracion de corridas viejas
+- evaluar descarga o resume desde remoto

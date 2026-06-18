@@ -1,6 +1,6 @@
 # Implementation checkpoint
 
-Fecha base: 2026-06-14
+Fecha base: 2026-06-17
 
 ## Objetivo de este archivo
 
@@ -18,7 +18,8 @@ Sirve para:
 - escenario activo actual: `basic`
 - flujo principal: `make train`
 - flujo recomendado para primera corrida limpia: `make train-from-scratch`
-- fase actual: `Fase 1`
+- fase actual de entrenamiento: `Fase 1`
+- fase actual de storage: `Fase 2`
 
 ## Ya implementado
 
@@ -103,12 +104,51 @@ Comandos principales disponibles:
 - lectura JSON tolerante a BOM UTF-8
 - evita fallo de `make list-runs` con archivos legacy
 
+### Persistencia remota y arquitectura hibrida
+
+- `alembic` operativo
+- schema inicial creado con:
+  - `training_runs`
+  - `run_artifacts`
+  - `sync_events`
+- `Neon / PostgreSQL` validado como store remoto de metadata
+- `AWS S3` validado como store remoto principal de artefactos
+- `MinIO` local soportado como backend de prueba
+- selector de backend remoto:
+  - `AGENTE_DOOM_STORAGE_BACKEND=minio|s3`
+- `TrainingRunRepository` guarda metadata final de corrida en DB
+- `ArtifactSyncService` sincroniza artefactos pesados sin romper entrenamiento si falla nube
+- `list-runs` ya puede leer desde DB con fallback local
+
+### Sync remoto ya validado
+
+- `report.json`:
+  - queda local
+  - se indexa por DB
+- `checkpoint final`:
+  - local
+  - remoto
+- `best checkpoint`:
+  - solo se registra y sincroniza si la corrida realmente genero uno nuevo
+- `video`:
+  - local
+  - remoto
+
+### Infra local auxiliar
+
+- `docker-compose.yml` para `MinIO` local
+- targets:
+  - `make minio-up`
+  - `make minio-down`
+  - `make minio-logs`
+
 ### Tests
 
 - tests reorganizados por paquetes:
   - `tests/cli`
   - `tests/configuration`
   - `tests/envs`
+  - `tests/persistence`
   - `tests/services`
   - `tests/storage`
   - `tests/utils`
@@ -120,13 +160,16 @@ Comandos principales disponibles:
 2. `make check`
 3. `make train-from-scratch`
 4. `make tensorboard`
-5. `make list-runs`
-6. `make list-checkpoints`
-7. `make evaluate`
+5. validar en `Neon`
+6. validar en `S3`
+7. `make list-runs`
+8. `make list-checkpoints`
+9. `make evaluate`
 
 ## Siguiente paso recomendado
 
 - correr primera corrida real larga sobre `basic`
-- observar reward, actions y comportamiento visual
+- observar reward, actions, comportamiento visual y sync remoto
 - registrar resultados en [experiment_log.md](/E:/agente-doom/Docs/experiment_log.md:1)
 - decidir si ajustar preset de `basic`
+- luego agregar comando manual de resincronizacion y descarga remota

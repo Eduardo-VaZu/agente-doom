@@ -14,8 +14,12 @@ Bitacora de pruebas: [experiment_log.md](/E:/agente-doom/Docs/experiment_log.md:
 
 - modelo actual: `foundation`
 - escenario activo actual: `basic`
-- fase actual: `Fase 1`
+- fase actual de entrenamiento: `Fase 1`
+- fase actual de storage: `Fase 2`
 - ultimo objetivo claro: estabilizar pipeline y configuracion base
+- infraestructura remota actual:
+  - metadata en `Neon`
+  - artefactos en `AWS S3`
 
 ## Regla general
 
@@ -51,6 +55,12 @@ Entregables:
 
 Estado:
 - en progreso
+
+Bloqueos de salida actuales:
+
+- falta corrida larga limpia de `basic`
+- falta criterio numerico de salida de `basic`
+- falta registrar resultado empirico final post-limpieza
 
 ## Fase 2: Expansion generalista
 
@@ -127,11 +137,13 @@ Estado:
 - modelo renombrado conceptualmente a `foundation`
 - arquitectura de config separada en `base.toml` + `configs/scenarios/*.toml`
 - `basic` dejado como escenario activo inicial
+- arquitectura de persistencia remota base validada con `Neon + S3`
 
 ### En progreso
 
 - afinado de `basic`
 - consolidacion de pruebas y estructura del proyecto
+- validacion de primera corrida larga limpia tras limpieza de artefactos de prueba
 
 ### Siguiente
 

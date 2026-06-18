@@ -3,6 +3,7 @@
 Proyecto de entrenamiento en ViZDoom con `Stable-Baselines3` y `RecurrentPPO`.
 
 Hoy el flujo principal entrena modelo `foundation` sobre escenario `basic`, usando `make` como punto unico de operacion.
+La persistencia remota activa usa `Neon` para metadata y `AWS S3` para artefactos pesados.
 
 ## Requisitos
 
@@ -73,6 +74,26 @@ Evaluar modelo visualmente:
 make evaluate
 ```
 
+## Storage remoto
+
+Backend remoto principal:
+
+- metadata: `Neon / PostgreSQL`
+- object storage: `AWS S3`
+
+Variables esperadas en `.env`:
+
+```env
+AGENTE_DOOM_DATABASE_URL="postgresql+psycopg://USER:PASSWORD@HOST/neondb?sslmode=require"
+AGENTE_DOOM_STORAGE_BACKEND="s3"
+AGENTE_DOOM_S3_BUCKET="agente-doom-artifacts-prod"
+AGENTE_DOOM_S3_REGION="us-east-1"
+AGENTE_DOOM_S3_ACCESS_KEY_ID="TU_ACCESS_KEY_ID"
+AGENTE_DOOM_S3_SECRET_ACCESS_KEY="TU_SECRET_ACCESS_KEY"
+AGENTE_DOOM_S3_ENDPOINT_URL=""
+AGENTE_DOOM_S3_OBJECT_PREFIX="runs"
+```
+
 ## MinIO local opcional
 
 Si quieres probar sync remoto sin montar nada en nube, proyecto ya trae `docker-compose.yml`
@@ -141,6 +162,8 @@ make evaluate
 
 Si MinIO esta configurado en `.env`, al final de cada corrida proyecto intentara subir
 checkpoints remotos y registrar resultado en `PostgreSQL`.
+
+Si `AGENTE_DOOM_STORAGE_BACKEND="s3"`, proyecto usara `AWS S3` como backend remoto principal.
 
 ## Comandos principales
 
@@ -226,6 +249,8 @@ make inspect CHECKPOINT=artifacts\checkpoints\doom_foundation_agent.zip
 
 - modelo activo: `foundation`
 - escenario activo: `basic`
+- fase entrenamiento: `Fase 1`
+- fase storage: `Fase 2`
 - flujo principal: `train --scenario <scenario>`
 - comandos retirados del flujo publico:
   - `sweep`

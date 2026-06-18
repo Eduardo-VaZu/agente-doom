@@ -25,9 +25,9 @@ Este directorio se divide en dos tipos de documento:
   Bitacora cronologica de cambios y resultados. Responde: que ya se probo y que paso.
 
 - [storage_roadmap.md](/E:/agente-doom/Docs/storage_roadmap.md:1)
-  Evolucion del almacenamiento. Responde: como se guardan artefactos hoy y como migraran despues.
+  Evolucion del almacenamiento. Responde: como se guardan artefactos hoy, que fase ya esta completa y que falta para operacion remota estable.
 
-- [implementation_checkpoint.md](/E:/agente-doom/docs/implementation_checkpoint.md:1)
+- [implementation_checkpoint.md](/E:/agente-doom/Docs/implementation_checkpoint.md:1)
   Checkpoint consolidado del estado real implementado. Responde: que ya existe hoy en codigo y operacion.
 
 ## Como usarlos juntos
@@ -44,7 +44,7 @@ Este directorio se divide en dos tipos de documento:
 
 5. Si necesitas revisar almacenamiento actual y futuro, abre [storage_roadmap.md](/E:/agente-doom/Docs/storage_roadmap.md:1)
 
-6. Si necesitas snapshot ejecutivo del repo, abre [implementation_checkpoint.md](/E:/agente-doom/docs/implementation_checkpoint.md:1)
+6. Si necesitas snapshot ejecutivo del repo, abre [implementation_checkpoint.md](/E:/agente-doom/Docs/implementation_checkpoint.md:1)
 
 7. Si necesitas agregar un escenario nuevo, abre [how_to_add_scenario.md](/E:/agente-doom/Docs/how_to_add_scenario.md:1)
 
@@ -54,7 +54,7 @@ Este directorio se divide en dos tipos de documento:
 
 - `vizdoom_escenarios_oficiales.md` no se usa para seguimiento diario.
 - `roadmap_curriculum.md` define estrategia.
-- `current_status.md` define ejecucion inmediata.
+- `current_status.md` define ejecucion inmediata y separa fase de entrenamiento vs fase de storage.
 - `experiment_log.md` captura aprendizaje empirico.
 - `scenario_registry.md` centraliza estado por escenario.
 - `storage_roadmap.md` define evolucion de persistencia y nube.
