@@ -40,6 +40,7 @@ Comandos visibles:
 - `inspect-checkpoint`
 - `list-checkpoints`
 - `list-runs`
+- `sync-artifacts`
 
 Comandos retirados del flujo publico:
 
@@ -63,6 +64,10 @@ Comandos principales disponibles:
 - `make inspect`
 - `make list-runs`
 - `make list-checkpoints`
+- `make sync-artifacts RUN_ID=<run_id>`
+- `make sync-local-only LIMIT=20`
+- `make sync-failed LIMIT=20`
+- `make sync-dry-run RUN_ID=<run_id>`
 - `make tensorboard`
 
 ### Observabilidad
@@ -134,6 +139,24 @@ Comandos principales disponibles:
   - local
   - remoto
 
+### Resincronizacion manual implementada
+
+- comando CLI:
+  - `sync-artifacts --run-id <run_id>`
+  - `sync-artifacts --all-local-only --limit <n>`
+  - `sync-artifacts --all-failed --limit <n>`
+  - `sync-artifacts --run-id <run_id> --dry-run`
+- targets `make`:
+  - `make sync-artifacts RUN_ID=<run_id>`
+  - `make sync-local-only LIMIT=20`
+  - `make sync-failed LIMIT=20`
+  - `make sync-dry-run RUN_ID=<run_id>`
+- soporta resincronizar corridas existentes sin reentrenar
+- `dry-run` muestra candidatos sin subir ni tocar DB
+- audita reintentos en `sync_events`
+- si una corrida mezcla subidas exitosas y fallidas, estado final queda `failed`
+- si no hay candidatos de sync, se informa claramente y no se muta estado
+
 ### Infra local auxiliar
 
 - `docker-compose.yml` para `MinIO` local
@@ -172,4 +195,4 @@ Comandos principales disponibles:
 - observar reward, actions, comportamiento visual y sync remoto
 - registrar resultados en [experiment_log.md](/E:/agente-doom/Docs/experiment_log.md:1)
 - decidir si ajustar preset de `basic`
-- luego agregar comando manual de resincronizacion y descarga remota
+- luego definir migracion de corridas viejas, descarga remota y restauracion desde `S3`

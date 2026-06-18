@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from doom_agent.cli.evaluate import add_evaluate_arguments
 from doom_agent.cli.main import _build_parser
+from doom_agent.cli.sync import add_sync_arguments
 from doom_agent.cli.train import add_train_arguments
 
 
@@ -40,6 +41,10 @@ class CliTests(unittest.TestCase):
             parser.parse_args(["inspect-checkpoint", "--scenario", "basic"]).command,
             "inspect-checkpoint",
         )
+        self.assertEqual(
+            parser.parse_args(["sync-artifacts", "--run-id", "run-123"]).command,
+            "sync-artifacts",
+        )
 
     def test_removed_commands_stay_removed_from_public_parser(self) -> None:
         parser = _build_parser()
@@ -49,6 +54,22 @@ class CliTests(unittest.TestCase):
             parser.parse_args(["list-scenarios"])
         with self.assertRaises(SystemExit):
             parser.parse_args(["list-profiles"])
+
+    def test_sync_parser_accepts_batch_modes(self) -> None:
+        parser = add_sync_arguments(io_arg_parser("sync-artifacts"))
+        args = parser.parse_args(["--all-local-only", "--limit", "5"])
+        self.assertTrue(args.all_local_only)
+        self.assertEqual(args.limit, 5)
+
+        args = parser.parse_args(["--all-failed"])
+        self.assertTrue(args.all_failed)
+
+    def test_sync_parser_rejects_missing_or_multiple_targets(self) -> None:
+        parser = add_sync_arguments(io_arg_parser("sync-artifacts"))
+        with self.assertRaises(SystemExit):
+            parser.parse_args([])
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["--run-id", "run-1", "--all-failed"])
 
 
 def io_arg_parser(prog: str) -> argparse.ArgumentParser:

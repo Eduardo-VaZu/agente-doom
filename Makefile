@@ -18,6 +18,7 @@ EVAL_EPISODES ?= 5
 FROM_SCRATCH ?= 0
 ALLOW_SCENARIO_RESUME ?= 0
 NO_SAVE_BEST ?= 0
+RUN_ID ?=
 
 TRAIN_FLAGS = --scenario $(SCENARIO) $(if $(TIMESTEPS),--timesteps $(TIMESTEPS),) $(if $(SEED),--seed $(SEED),) $(if $(RESUME),--resume $(RESUME),) $(if $(EVAL_FREQ),--eval-freq $(EVAL_FREQ),) $(if $(EVAL_EPISODES),--eval-episodes $(EVAL_EPISODES),) $(if $(filter 1 true yes,$(FROM_SCRATCH)),--from-scratch,) $(if $(filter 1 true yes,$(ALLOW_SCENARIO_RESUME)),--allow-scenario-resume,) $(if $(filter 1 true yes,$(NO_SAVE_BEST)),--no-save-best,)
 EVALUATE_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT) $(if $(STEPS),--steps $(STEPS),)
@@ -26,7 +27,8 @@ CANCEL_EXIT_CODES = @(130, 3221225786, -1073741510)
 
 .PHONY: help venv install setup bootstrap lint typecheck test check precommit \
 	list-checkpoints list-runs inspect evaluate evaluate-last play train train-from-scratch \
-	train-latest tensorboard minio-up minio-down minio-logs
+	train-latest tensorboard minio-up minio-down minio-logs sync-artifacts sync-local-only \
+	sync-failed sync-dry-run
 
 help:
 	@echo "Targets principales:"
@@ -48,6 +50,10 @@ help:
 	@echo "  make minio-up          		# levanta MinIO local en Docker"
 	@echo "  make minio-down        		# detiene MinIO local"
 	@echo "  make minio-logs        		# muestra logs de MinIO local"
+	@echo "  make sync-artifacts    		# RUN_ID=<run_id>"
+	@echo "  make sync-local-only   		# LIMIT=20"
+	@echo "  make sync-failed       		# LIMIT=20"
+	@echo "  make sync-dry-run      		# RUN_ID=<run_id>"
 	@echo ""
 	@echo "Variables utiles:"
 	@echo "  SCENARIO=basic"
@@ -55,6 +61,7 @@ help:
 	@echo "  SEED=42"
 	@echo "  STEPS=2000"
 	@echo "  CHECKPOINT=artifacts\\checkpoints\\doom_foundation_agent.zip"
+	@echo "  RUN_ID=doom_foundation_agent__YYYYMMDDTHHMMSSffffffZ"
 
 venv:
 	@py -3.13 -m venv .venv
@@ -92,6 +99,20 @@ minio-down:
 
 minio-logs:
 	@docker compose logs -f minio
+
+sync-artifacts:
+	@if (-not "$(RUN_ID)") { throw "Debes pasar RUN_ID=<run_id>." }
+	@& "$(PYTHON)" "$(CLI)" sync-artifacts --run-id "$(RUN_ID)"
+
+sync-local-only:
+	@& "$(PYTHON)" "$(CLI)" sync-artifacts --all-local-only --limit $(LIMIT)
+
+sync-failed:
+	@& "$(PYTHON)" "$(CLI)" sync-artifacts --all-failed --limit $(LIMIT)
+
+sync-dry-run:
+	@if (-not "$(RUN_ID)") { throw "Debes pasar RUN_ID=<run_id>." }
+	@& "$(PYTHON)" "$(CLI)" sync-artifacts --run-id "$(RUN_ID)" --dry-run
 
 list-checkpoints:
 	@& "$(PYTHON)" "$(CLI)" list-checkpoints --limit $(LIMIT)

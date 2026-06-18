@@ -165,6 +165,18 @@ checkpoints remotos y registrar resultado en `PostgreSQL`.
 
 Si `AGENTE_DOOM_STORAGE_BACKEND="s3"`, proyecto usara `AWS S3` como backend remoto principal.
 
+Si una corrida queda `local_only` o `failed`, ahora puedes resincronizar artefactos manualmente
+sin reentrenar. Este resync solo considera `checkpoint` y `video`; `report.json` sigue local.
+
+Ejemplos:
+
+```powershell
+.\.venv\Scripts\python.exe src\cli.py sync-artifacts --run-id doom_foundation_agent__20260617T040513523127Z
+.\.venv\Scripts\python.exe src\cli.py sync-artifacts --all-local-only --limit 20
+.\.venv\Scripts\python.exe src\cli.py sync-artifacts --all-failed --limit 20
+.\.venv\Scripts\python.exe src\cli.py sync-artifacts --run-id doom_foundation_agent__20260617T040513523127Z --dry-run
+```
+
 ## Comandos principales
 
 Preparacion:
@@ -207,6 +219,10 @@ Seguimiento:
 ```powershell
 make list-runs
 make list-checkpoints
+make sync-artifacts RUN_ID=doom_foundation_agent__20260617T040513523127Z
+make sync-local-only LIMIT=20
+make sync-failed LIMIT=20
+make sync-dry-run RUN_ID=doom_foundation_agent__20260617T040513523127Z
 make tensorboard
 ```
 

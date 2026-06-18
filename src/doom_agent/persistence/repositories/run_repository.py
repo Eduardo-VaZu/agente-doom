@@ -190,6 +190,19 @@ class TrainingRunRepository:
         finally:
             session.close()
 
+    def list_run_ids_by_sync_status(self, *, sync_status: str, limit: int = 20) -> list[str]:
+        session = self._session_factory()
+        try:
+            statement = (
+                select(TrainingRun.run_id)
+                .where(TrainingRun.sync_status == sync_status)
+                .order_by(TrainingRun.created_at_utc.desc())
+                .limit(limit)
+            )
+            return [str(run_id) for run_id in session.scalars(statement)]
+        finally:
+            session.close()
+
     def list_sync_candidates(self, run_id: str) -> list[SyncCandidateArtifact]:
         session = self._session_factory()
         try:

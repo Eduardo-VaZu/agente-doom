@@ -149,7 +149,7 @@ Resultado esperado:
 
 Pendiente para considerar esta fase completa:
 
-- comando manual de resincronizacion de artefactos
+- comando manual de resincronizacion de artefactos implementado
 - migracion de corridas antiguas `local_only`
 - descarga o restauracion desde `S3`
 - politica operativa clara para `best checkpoint` y reintentos
@@ -210,6 +210,6 @@ Actualmente:
 
 Despues:
 
-- agregar comando de `resync`
+- usar `sync-artifacts` para resincronizar corridas viejas o fallidas sin reentrenar
 - definir operacion de limpieza y migracion de corridas viejas
 - evaluar descarga o resume desde remoto

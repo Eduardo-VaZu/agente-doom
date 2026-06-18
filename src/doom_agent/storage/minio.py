@@ -44,6 +44,10 @@ class MinioArtifactStore:
     def object_prefix(self) -> str:
         return self._settings.object_prefix
 
+    @property
+    def storage_backend(self) -> str:
+        return "minio"
+
     def _ensure_bucket_exists(self) -> None:
         if self._client.bucket_exists(self._settings.bucket_name):
             return

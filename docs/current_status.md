@@ -41,6 +41,7 @@ Foco actual:
 - persistencia de corridas en `Neon`
 - lectura de `list-runs` desde `PostgreSQL` con fallback a JSON local
 - sync remoto de checkpoints finales y videos a `AWS S3`
+- resincronizacion manual con `sync-artifacts` para corridas `local_only` o `failed`
 - backend `MinIO` local opcional para pruebas
 - selector de backend remoto por `AGENTE_DOOM_STORAGE_BACKEND=minio|s3`
 
@@ -49,7 +50,6 @@ Foco actual:
 - falta validar corrida real larga de entrenamiento sobre `basic` con estado limpio
 - falta registrar resultados empiricos en `experiment_log.md`
 - falta definir criterio numerico exacto de salida de `basic`
-- falta comando manual para resincronizar corridas `local_only` o `failed`
 - falta descarga o reanudacion desde artefactos remotos
 
 ## Siguiente accion recomendada
@@ -63,7 +63,8 @@ Foco actual:
    - `sync_events`
 5. validar objetos en `AWS S3`
 6. registrar resultado en [experiment_log.md](/E:/agente-doom/Docs/experiment_log.md:1)
-7. decidir si ajustar `configs/scenarios/basic.toml`
+7. usar `sync-artifacts --dry-run` o `make sync-local-only` si alguna corrida queda pendiente
+8. decidir si ajustar `configs/scenarios/basic.toml`
 
 ## Cuando actualizar este archivo
 

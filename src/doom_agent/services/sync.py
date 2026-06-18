@@ -25,6 +25,22 @@ class SyncRunResult:
     final_status: str
 
 
+@dataclass(frozen=True, slots=True)
+class SyncArtifactPreview:
+    artifact_id: int
+    artifact_type: str
+    artifact_role: str | None
+    local_path: str
+    object_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class SyncRunPreview:
+    run_id: str
+    storage_backend: str
+    candidates: list[SyncArtifactPreview]
+
+
 class SyncRepository(Protocol):
     def list_sync_candidates(self, run_id: str) -> list[SyncCandidateArtifact]: ...
 
@@ -90,6 +106,23 @@ class ArtifactSyncService:
         else:
             self._object_prefix = DEFAULT_OBJECT_PREFIX
 
+    def describe_run_sync(self, run_id: str) -> SyncRunPreview:
+        candidates = self._repository.list_sync_candidates(run_id)
+        return SyncRunPreview(
+            run_id=run_id,
+            storage_backend=_resolve_storage_backend_name(self._artifact_store),
+            candidates=[
+                SyncArtifactPreview(
+                    artifact_id=candidate.artifact_id,
+                    artifact_type=candidate.artifact_type,
+                    artifact_role=candidate.artifact_role,
+                    local_path=str(candidate.local_path),
+                    object_key=self._build_object_key(candidate),
+                )
+                for candidate in candidates
+            ],
+        )
+
     def sync_run(self, run_id: str) -> SyncRunResult:
         candidates = self._repository.list_sync_candidates(run_id)
         if not candidates:
@@ -125,14 +158,11 @@ class ArtifactSyncService:
             final_status=final_status,
         )
 
+    def sync_runs(self, run_ids: list[str]) -> list[SyncRunResult]:
+        return [self.sync_run(run_id) for run_id in run_ids]
+
     def _sync_artifact(self, candidate: SyncCandidateArtifact) -> bool:
-        object_key = build_remote_object_key(
-            object_prefix=self._object_prefix,
-            run_id=candidate.run_id,
-            run_local_dir=candidate.run_local_dir,
-            local_path=candidate.local_path,
-            artifact_type=candidate.artifact_type,
-        )
+        object_key = self._build_object_key(candidate)
         self._repository.mark_artifact_sync_pending(candidate.artifact_id)
         event_id = self._repository.create_sync_event_start(
             run_id=candidate.run_id,
@@ -183,9 +213,22 @@ class ArtifactSyncService:
             )
             return False
 
+    def _build_object_key(self, candidate: SyncCandidateArtifact) -> str:
+        return build_remote_object_key(
+            object_prefix=self._object_prefix,
+            run_id=candidate.run_id,
+            run_local_dir=candidate.run_local_dir,
+            local_path=candidate.local_path,
+            artifact_type=candidate.artifact_type,
+        )
+
 
 def _build_default_artifact_store() -> ArtifactStore:
     backend = get_storage_backend()
     if backend == "s3":
         return S3ArtifactStore()
     return MinioArtifactStore()
+
+
+def _resolve_storage_backend_name(artifact_store: ArtifactStore) -> str:
+    return str(getattr(artifact_store, "storage_backend", get_storage_backend()))

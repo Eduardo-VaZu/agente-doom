@@ -4,9 +4,14 @@ import argparse
 import json
 
 from doom_agent.cli.evaluate import add_evaluate_arguments
+from doom_agent.cli.sync import add_sync_arguments
 from doom_agent.cli.train import add_train_arguments
 from doom_agent.config import build_project_paths, get_training_profile
+from doom_agent.persistence.enums import SyncStatus
+from doom_agent.persistence.repositories import TrainingRunRepository
+from doom_agent.services.sync import ArtifactSyncService
 from doom_agent.utils.checkpoints import list_all_checkpoints, resolve_checkpoint_preference
+from doom_agent.utils.console import print_block, print_kv_block
 from doom_agent.utils.reports import list_experiment_runs
 
 
@@ -49,6 +54,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "inspect-checkpoint", help="Muestra la metadata de un checkpoint."
     )
     add_evaluate_arguments(inspect_parser)
+
+    sync_parser = subparsers.add_parser(
+        "sync-artifacts", help="Resincroniza artefactos locales hacia storage remoto."
+    )
+    add_sync_arguments(sync_parser)
     return parser
 
 
@@ -110,6 +120,88 @@ def _inspect_checkpoint(args: argparse.Namespace) -> None:
     print(json.dumps(checkpoint.metadata, indent=2, sort_keys=True))
 
 
+def _print_sync_preview(args: argparse.Namespace) -> None:
+    service = ArtifactSyncService()
+    run_ids = _resolve_sync_run_ids(args)
+    if not run_ids:
+        print("No se encontraron corridas para sincronizar.")
+        return
+
+    for run_id in run_ids:
+        preview = service.describe_run_sync(run_id)
+        if not preview.candidates:
+            print_block(
+                "Artifact Sync Preview",
+                [
+                    f"run_id={run_id}",
+                    "Sin candidatos de sync.",
+                ],
+            )
+            continue
+
+        print_kv_block(
+            "Artifact Sync Preview",
+            [
+                ("run_id", preview.run_id),
+                ("backend", preview.storage_backend),
+                ("candidates", len(preview.candidates)),
+            ],
+        )
+        for candidate in preview.candidates:
+            print_kv_block(
+                "Artifact",
+                [
+                    ("artifact_id", candidate.artifact_id),
+                    ("type", candidate.artifact_type),
+                    ("role", candidate.artifact_role),
+                    ("local_path", candidate.local_path),
+                    ("object_key", candidate.object_key),
+                ],
+            )
+
+
+def _run_sync(args: argparse.Namespace) -> None:
+    if args.dry_run:
+        _print_sync_preview(args)
+        return
+
+    service = ArtifactSyncService()
+    run_ids = _resolve_sync_run_ids(args)
+    if not run_ids:
+        print("No se encontraron corridas para sincronizar.")
+        return
+
+    for result in service.sync_runs(run_ids):
+        if result.attempted_count == 0:
+            print_block(
+                "Artifact Sync",
+                [
+                    f"run_id={result.run_id}",
+                    "Sin candidatos de sync.",
+                ],
+            )
+            continue
+        print_kv_block(
+            "Artifact Sync",
+            [
+                ("run_id", result.run_id),
+                ("attempted", result.attempted_count),
+                ("synced", result.synced_count),
+                ("failed", result.failed_count),
+                ("status", result.final_status),
+            ],
+        )
+
+
+def _resolve_sync_run_ids(args: argparse.Namespace) -> list[str]:
+    if args.run_id is not None:
+        return [args.run_id]
+
+    repository = TrainingRunRepository()
+    sync_status = SyncStatus.LOCAL_ONLY.value if args.all_local_only else SyncStatus.FAILED.value
+    return repository.list_run_ids_by_sync_status(sync_status=sync_status, limit=args.limit)
+
+
 def main() -> None:
     from doom_agent.services.evaluator import evaluate
     from doom_agent.services.trainer import train
@@ -156,6 +248,10 @@ def main() -> None:
 
     if args.command == "inspect-checkpoint":
         _inspect_checkpoint(args)
+        return
+
+    if args.command == "sync-artifacts":
+        _run_sync(args)
         return
 
     raise SystemExit(f"Comando no soportado: {args.command}")

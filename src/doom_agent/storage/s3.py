@@ -46,6 +46,10 @@ class S3ArtifactStore:
     def object_prefix(self) -> str:
         return self._settings.object_prefix
 
+    @property
+    def storage_backend(self) -> str:
+        return "s3"
+
     def _head_etag(self, object_key: str) -> str | None:
         response = self._client.head_object(
             Bucket=self._settings.bucket_name,

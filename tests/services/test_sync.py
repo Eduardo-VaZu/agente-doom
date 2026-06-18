@@ -188,3 +188,113 @@ class ArtifactSyncServiceTests(unittest.TestCase):
             self.assertEqual(len(repository.failed_events), 1)
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)
+
+    def test_sync_runs_supports_batch_execution(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "sync-service-batch"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        first_checkpoint_dir = root_dir / "run-1" / "checkpoints"
+        second_checkpoint_dir = root_dir / "run-2" / "videos"
+        first_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        second_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        first_path = first_checkpoint_dir / "final_model.zip"
+        second_path = second_checkpoint_dir / "doom_foundation_agent-step-0-to-step-1500.mp4"
+        first_path.write_text("checkpoint", encoding="utf-8")
+        second_path.write_text("video", encoding="utf-8")
+
+        candidates = [
+            SyncCandidateArtifact(
+                artifact_id=1,
+                run_id="run-1",
+                artifact_type="checkpoint",
+                artifact_role="final",
+                local_path=first_path,
+                run_local_dir=root_dir / "run-1",
+            ),
+            SyncCandidateArtifact(
+                artifact_id=2,
+                run_id="run-2",
+                artifact_type="video",
+                artifact_role=None,
+                local_path=second_path,
+                run_local_dir=root_dir / "run-2",
+            ),
+        ]
+        repository = FakeSyncRepository(candidates)
+        artifact_store = FakeArtifactStore(storage_backend="s3")
+
+        try:
+            results = ArtifactSyncService(
+                repository=repository,
+                artifact_store=artifact_store,
+                object_prefix="runs",
+            ).sync_runs(["run-1", "run-2"])
+
+            self.assertEqual(len(results), 2)
+            self.assertEqual(results[0].run_id, "run-1")
+            self.assertEqual(results[1].run_id, "run-2")
+            self.assertEqual(len(artifact_store.upload_calls), 2)
+        finally:
+            shutil.rmtree(root_dir, ignore_errors=True)
+
+    def test_describe_run_sync_does_not_upload(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "sync-service-preview"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        checkpoint_dir = root_dir / "run" / "checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint_path = checkpoint_dir / "final_model.zip"
+        checkpoint_path.write_text("checkpoint", encoding="utf-8")
+
+        candidate = SyncCandidateArtifact(
+            artifact_id=3,
+            run_id="run-preview",
+            artifact_type="checkpoint",
+            artifact_role="final",
+            local_path=checkpoint_path,
+            run_local_dir=root_dir / "run",
+        )
+        repository = FakeSyncRepository([candidate])
+        artifact_store = FakeArtifactStore(storage_backend="s3")
+
+        try:
+            preview = ArtifactSyncService(
+                repository=repository,
+                artifact_store=artifact_store,
+                object_prefix="runs",
+            ).describe_run_sync("run-preview")
+
+            self.assertEqual(preview.run_id, "run-preview")
+            self.assertEqual(preview.storage_backend, "s3")
+            self.assertEqual(len(preview.candidates), 1)
+            self.assertEqual(
+                preview.candidates[0].object_key,
+                "runs/run-preview/checkpoints/final_model.zip",
+            )
+            self.assertEqual(artifact_store.upload_calls, [])
+        finally:
+            shutil.rmtree(root_dir, ignore_errors=True)
+
+    def test_sync_run_marks_missing_local_file_as_failed(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "sync-service-missing-file"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        candidate = SyncCandidateArtifact(
+            artifact_id=9,
+            run_id="run-missing",
+            artifact_type="checkpoint",
+            artifact_role="final",
+            local_path=root_dir / "run" / "checkpoints" / "final_model.zip",
+            run_local_dir=root_dir / "run",
+        )
+        repository = FakeSyncRepository([candidate])
+        artifact_store = FakeArtifactStore()
+
+        result = ArtifactSyncService(
+            repository=repository,
+            artifact_store=artifact_store,
+            object_prefix="runs",
+        ).sync_run("run-missing")
+
+        self.assertEqual(result.final_status, "failed")
+        self.assertEqual(result.failed_count, 1)
+        self.assertEqual(artifact_store.upload_calls, [])
+        self.assertEqual(repository.failed_artifacts[0][0], 9)
