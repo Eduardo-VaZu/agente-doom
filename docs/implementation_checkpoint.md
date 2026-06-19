@@ -193,6 +193,6 @@ Comandos principales disponibles:
 
 - correr primera corrida real larga sobre `basic`
 - observar reward, actions, comportamiento visual y sync remoto
-- registrar resultados en [experiment_log.md](/E:/agente-doom/Docs/experiment_log.md:1)
+- registrar resultados en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
 - decidir si ajustar preset de `basic`
 - luego definir migracion de corridas viejas, descarga remota y restauracion desde `S3`

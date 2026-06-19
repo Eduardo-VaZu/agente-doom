@@ -5,10 +5,10 @@ Modelo objetivo: `foundation`
 Este documento no lista todo lo que existe en ViZDoom. Lista el orden practico de trabajo para
 entrenar y expandir el modelo de forma progresiva, estable y mantenible.
 
-Referencia de escenarios oficiales: [vizdoom_escenarios_oficiales.md](/E:/agente-doom/Docs/vizdoom_escenarios_oficiales.md:1)
-Estado vivo: [current_status.md](/E:/agente-doom/Docs/current_status.md:1)
-Registro de escenarios: [scenario_registry.md](/E:/agente-doom/Docs/scenario_registry.md:1)
-Bitacora de pruebas: [experiment_log.md](/E:/agente-doom/Docs/experiment_log.md:1)
+Referencia de escenarios oficiales: [vizdoom_escenarios_oficiales.md](/E:/agente-doom/docs/vizdoom_escenarios_oficiales.md:1)
+Estado vivo: [current_status.md](/E:/agente-doom/docs/current_status.md:1)
+Registro de escenarios: [scenario_registry.md](/E:/agente-doom/docs/scenario_registry.md:1)
+Bitacora de pruebas: [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
 
 ## Estado actual
 

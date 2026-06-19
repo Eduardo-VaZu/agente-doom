@@ -161,12 +161,12 @@ make evaluate
 ```
 
 Si MinIO esta configurado en `.env`, al final de cada corrida proyecto intentara subir
-checkpoints remotos y registrar resultado en `PostgreSQL`.
+artefactos remotos elegibles y registrar resultado en `PostgreSQL`.
 
 Si `AGENTE_DOOM_STORAGE_BACKEND="s3"`, proyecto usara `AWS S3` como backend remoto principal.
 
 Si una corrida queda `local_only` o `failed`, ahora puedes resincronizar artefactos manualmente
-sin reentrenar. Este resync solo considera `checkpoint` y `video`; `report.json` sigue local.
+sin reentrenar. Este resync considera `checkpoint` y `video`; `report.json` sigue local.
 
 Ejemplos:
 

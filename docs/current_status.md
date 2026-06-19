@@ -1,6 +1,6 @@
 # Current status
 
-Fecha base: 2026-06-17
+Fecha base: 2026-06-18
 
 ## Resumen ejecutivo
 
@@ -31,7 +31,7 @@ Foco actual:
 - `Makefile` con entrenamiento directo
 - `Makefile` con cancelacion limpia para `Ctrl+C` en comandos largos
 - documentacion estructurada por fases y por estado
-- almacenamiento definido por fases en `Docs/storage_roadmap.md`
+- almacenamiento definido por fases en `docs/storage_roadmap.md`
 - salida de consola del entrenamiento mejorada con bloques visuales
 - lectura JSON tolerante a BOM para reportes legacy de Windows
 - schema inicial de `PostgreSQL` con:
@@ -62,7 +62,7 @@ Foco actual:
    - `run_artifacts`
    - `sync_events`
 5. validar objetos en `AWS S3`
-6. registrar resultado en [experiment_log.md](/E:/agente-doom/Docs/experiment_log.md:1)
+6. registrar resultado en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
 7. usar `sync-artifacts --dry-run` o `make sync-local-only` si alguna corrida queda pendiente
 8. decidir si ajustar `configs/scenarios/basic.toml`
 

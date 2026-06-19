@@ -108,7 +108,7 @@ Esta prioridad es estimada, no oficial.
 
 Roadmap practico de trabajo por fases:
 
-- [roadmap_curriculum.md](/E:/agente-doom/Docs/roadmap_curriculum.md:1)
+- [roadmap_curriculum.md](/E:/agente-doom/docs/roadmap_curriculum.md:1)
 
 ## Fuentes oficiales
 

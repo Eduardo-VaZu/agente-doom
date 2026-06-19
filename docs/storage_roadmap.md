@@ -62,7 +62,7 @@ Acciones sugeridas:
 
 1. mantener todo local por ahora
 2. validar que checkpoints y reportes se guarden bien
-3. registrar corridas reales en `Docs/experiment_log.md`
+3. registrar corridas reales en `docs/experiment_log.md`
 4. definir convencion de nombres por `run_id`
 
 Convencion aplicada:
@@ -118,6 +118,7 @@ Implementado hoy:
 - `MinIO` local opcional para pruebas
 - escritura local primero, sync remoto despues
 - `list-runs` preferiendo DB con fallback a JSON local
+- `sync-artifacts` para resincronizacion manual sin reentrenar
 - sync validado para:
   - `final checkpoint`
   - `video`
@@ -149,7 +150,6 @@ Resultado esperado:
 
 Pendiente para considerar esta fase completa:
 
-- comando manual de resincronizacion de artefactos implementado
 - migracion de corridas antiguas `local_only`
 - descarga o restauracion desde `S3`
 - politica operativa clara para `best checkpoint` y reintentos

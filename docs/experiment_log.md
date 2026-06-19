@@ -25,7 +25,7 @@ Cada entrada debe incluir:
   - config separada en `base.toml` + `configs/scenarios/basic.toml`
   - `Makefile` reactivado con `make train`
   - tests reorganizados por area
-  - `Docs/` reorganizado como sistema de referencia + seguimiento
+  - `docs/` reorganizado como sistema de referencia + seguimiento
   - storage local por corrida implementado en `artifacts/runs/<run_id>/`
   - consola de entrenamiento mejorada con bloques visuales
   - cancelacion limpia por `Ctrl+C` aplicada a comandos largos de `make`
@@ -84,3 +84,27 @@ Cada entrada debe incluir:
 - decision siguiente:
   - correr primera corrida larga limpia de `basic`
   - registrar resultado empirico real del entrenamiento
+
+### 2026-06-18
+
+- escenario: `basic`
+- fase entrenamiento: `Fase 1`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se implemento `sync-artifacts`
+  - se agregaron modos `--run-id`, `--all-local-only`, `--all-failed` y `--dry-run`
+  - se agregaron targets `make sync-artifacts`, `make sync-local-only`, `make sync-failed` y `make sync-dry-run`
+  - se alineo documentacion de storage con resync manual implementado
+  - se valido limpieza total de local, `Neon` y bucket `S3`
+- comando ejecutado:
+  - `make check`
+  - `make sync-dry-run RUN_ID=doom_foundation_agent__20260617T040513523127Z`
+  - `make sync-local-only LIMIT=20`
+  - queries de verificacion en `training_runs` y `run_artifacts`
+- resultado observado:
+  - `sync-artifacts` operativo y validado
+  - sistema limpio responde sin falsos positivos
+  - no quedaron corridas, artefactos ni candidatos pendientes de sync
+- decision siguiente:
+  - correr nueva corrida limpia para repoblar metadata y artefactos reales
+  - validar pipeline completo de entrenamiento, persistencia y sync remoto
