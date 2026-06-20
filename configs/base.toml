@@ -1,6 +1,6 @@
 [defaults]
 scenario_key = "basic"
-render = true
+render = false
 record_video = true
 checkpoint_name = "doom_foundation_agent"
 tensorboard_run_name = "Doom_Foundation_Agent"
@@ -22,3 +22,7 @@ min_delta = 0.0
 
 [profiles.default]
 scenario_key = "basic"
+
+[profiles.basic_v2]
+scenario_key = "basic"
+ent_coef = 0.015

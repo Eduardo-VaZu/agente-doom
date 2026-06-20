@@ -147,6 +147,8 @@ class TrainingProfile:
     checkpoint_name: str
     tensorboard_run_name: str
     checkpoint_frequency: int
+    eval_frequency: int
+    eval_episodes: int
     video_record_frequency: int
     video_length: int
     frame_stack: int = 4
@@ -198,6 +200,8 @@ class TrainingProfile:
             "gae_lambda": self.gae_lambda,
             "requested_timesteps": self.requested_timesteps,
             "checkpoint_frequency": self.checkpoint_frequency,
+            "eval_frequency": self.eval_frequency,
+            "eval_episodes": self.eval_episodes,
             "video_record_frequency": self.video_record_frequency,
             "video_length": self.video_length,
             "frame_stack": self.frame_stack,
@@ -265,6 +269,8 @@ class TrainingProfile:
             "checkpoint_name": self.checkpoint_name,
             "tensorboard_run_name": self.tensorboard_run_name,
             "checkpoint_frequency": self.checkpoint_frequency,
+            "eval_frequency": self.eval_frequency,
+            "eval_episodes": self.eval_episodes,
             "video_record_frequency": self.video_record_frequency,
             "video_length": self.video_length,
             "frame_stack": self.frame_stack,
@@ -340,6 +346,7 @@ class TrainingProfile:
 
     @classmethod
     def from_dict(cls, payload: TrainingProfilePayload) -> TrainingProfile:
+        checkpoint_frequency = payload["checkpoint_frequency"]
         return cls(
             scenario_name=payload["scenario_name"],
             learning_rate=payload["learning_rate"],
@@ -354,7 +361,9 @@ class TrainingProfile:
             record_video=payload["record_video"],
             checkpoint_name=payload["checkpoint_name"],
             tensorboard_run_name=payload["tensorboard_run_name"],
-            checkpoint_frequency=payload["checkpoint_frequency"],
+            checkpoint_frequency=checkpoint_frequency,
+            eval_frequency=payload.get("eval_frequency", checkpoint_frequency),
+            eval_episodes=payload.get("eval_episodes", 5),
             video_record_frequency=payload["video_record_frequency"],
             video_length=payload["video_length"],
             frame_stack=payload.get("frame_stack", 4),

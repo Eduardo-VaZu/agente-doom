@@ -25,6 +25,16 @@ class CliTests(unittest.TestCase):
         args = parser.parse_args(["--scenario", "basic"])
         self.assertEqual(args.config, "default")
         self.assertEqual(args.scenario, "basic")
+        self.assertIsNone(args.episodes)
+        self.assertFalse(args.no_render)
+        self.assertFalse(args.json_output)
+
+    def test_evaluate_parser_accepts_offline_summary_options(self) -> None:
+        parser = add_evaluate_arguments(io_arg_parser("evaluate"))
+        args = parser.parse_args(["--scenario", "basic", "--episodes", "20", "--no-render", "--json"])
+        self.assertEqual(args.episodes, 20)
+        self.assertTrue(args.no_render)
+        self.assertTrue(args.json_output)
 
     def test_parser_keeps_train_and_evaluate_commands(self) -> None:
         parser = _build_parser()

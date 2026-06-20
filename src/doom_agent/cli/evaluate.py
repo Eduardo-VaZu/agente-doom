@@ -33,6 +33,23 @@ def add_evaluate_arguments(parser: argparse.ArgumentParser) -> argparse.Argument
         help="Cantidad maxima de pasos de evaluacion.",
     )
     parser.add_argument(
+        "--episodes",
+        type=int,
+        default=None,
+        help="Cantidad de episodios para evaluacion offline determinista.",
+    )
+    parser.add_argument(
+        "--no-render",
+        action="store_true",
+        help="Desactiva ventana/render durante evaluacion.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Imprime resumen estructurado en JSON para evaluacion offline.",
+    )
+    parser.add_argument(
         "--scenario",
         choices=SCENARIO_NAMES,
         default=None,
@@ -60,9 +77,12 @@ def main() -> None:
     evaluate(
         checkpoint_name=args.checkpoint,
         steps=args.steps,
+        episodes=args.episodes,
         profile_name=args.config,
         checkpoint_selection=args.select,
         scenario_name=args.scenario,
+        render=not args.no_render,
+        json_output=args.json_output,
     )
 
 

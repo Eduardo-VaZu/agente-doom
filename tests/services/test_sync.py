@@ -121,19 +121,33 @@ class ArtifactSyncServiceTests(unittest.TestCase):
         root_dir = Path("artifacts") / "test-temp" / "sync-service-success"
         shutil.rmtree(root_dir, ignore_errors=True)
         checkpoint_dir = root_dir / "run" / "checkpoints"
+        report_dir = root_dir / "run"
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        report_dir.mkdir(parents=True, exist_ok=True)
         checkpoint_path = checkpoint_dir / "final_model.zip"
+        report_path = report_dir / "report.json"
         checkpoint_path.write_text("checkpoint", encoding="utf-8")
+        report_path.write_text("{}", encoding="utf-8")
 
-        candidate = SyncCandidateArtifact(
-            artifact_id=1,
-            run_id="run-1",
-            artifact_type="checkpoint",
-            artifact_role="final",
-            local_path=checkpoint_path,
-            run_local_dir=root_dir / "run",
-        )
-        repository = FakeSyncRepository([candidate])
+        candidates = [
+            SyncCandidateArtifact(
+                artifact_id=1,
+                run_id="run-1",
+                artifact_type="checkpoint",
+                artifact_role="final",
+                local_path=checkpoint_path,
+                run_local_dir=root_dir / "run",
+            ),
+            SyncCandidateArtifact(
+                artifact_id=2,
+                run_id="run-1",
+                artifact_type="report",
+                artifact_role="summary",
+                local_path=report_path,
+                run_local_dir=root_dir / "run",
+            ),
+        ]
+        repository = FakeSyncRepository(candidates)
         artifact_store = FakeArtifactStore()
 
         try:
@@ -143,12 +157,16 @@ class ArtifactSyncServiceTests(unittest.TestCase):
                 object_prefix="runs",
             ).sync_run("run-1")
 
-            self.assertEqual(result.synced_count, 1)
+            self.assertEqual(result.synced_count, 2)
             self.assertEqual(result.failed_count, 0)
             self.assertEqual(result.final_status, "synced")
             self.assertEqual(
                 artifact_store.upload_calls[0][1],
                 "runs/run-1/checkpoints/final_model.zip",
+            )
+            self.assertEqual(
+                artifact_store.upload_calls[1][1],
+                "runs/run-1/report.json",
             )
             self.assertEqual(repository.updated_run_statuses[-1], ("run-1", "synced"))
         finally:

@@ -27,6 +27,8 @@ def _legacy_config_to_profile(config: LegacyConfigPayload) -> TrainingProfile:
         "checkpoint_name": config.get("save_name", "doom_foundation_agent"),
         "tensorboard_run_name": config.get("tb_log_name", "Doom_Foundation_Agent"),
         "checkpoint_frequency": config.get("checkpoint_freq", 25000),
+        "eval_frequency": config.get("eval_frequency", config.get("checkpoint_freq", 25000)),
+        "eval_episodes": config.get("eval_episodes", 5),
         "video_record_frequency": config.get(
             "video_record_frequency",
             config.get("checkpoint_freq", 25000),

@@ -8,6 +8,7 @@ from doom_agent.config.schema import ProjectPaths, TrainingProfile
 from doom_agent.persistence import has_explicit_database_url
 from doom_agent.persistence.repositories import TrainingRunRepository
 from doom_agent.shared.contracts import (
+    EvaluationHistoryEntryPayload,
     EvaluationMetricsPayload,
     ExperimentIndexEntryPayload,
     ExperimentIndexPayload,
@@ -42,6 +43,7 @@ def build_training_run_report(
     duration_seconds: float,
     stopped_early: bool,
     stop_reason: str | None,
+    evaluation_history: list[EvaluationHistoryEntryPayload] | None = None,
 ) -> TrainingRunReportPayload:
     return {
         "run_id": run_id,
@@ -72,6 +74,7 @@ def build_training_run_report(
         "resume_source": resume_source,
         "resume_saved_timesteps": resume_saved_timesteps,
         "evaluation_metrics": evaluation_metrics,
+        "evaluation_history": [] if evaluation_history is None else evaluation_history,
         "duration_seconds": duration_seconds,
         "stopped_early": stopped_early,
         "stop_reason": stop_reason,

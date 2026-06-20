@@ -58,13 +58,13 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         "--eval-freq",
         type=int,
         default=None,
-        help="Frecuencia de evaluacion periodica en pasos. Por defecto usa checkpoint_frequency.",
+        help="Frecuencia de evaluacion periodica en pasos. Por defecto usa valor del perfil.",
     )
     parser.add_argument(
         "--eval-episodes",
         type=int,
-        default=5,
-        help="Cantidad de episodios por evaluacion periodica.",
+        default=None,
+        help="Cantidad de episodios por evaluacion periodica. Por defecto usa valor del perfil.",
     )
     parser.add_argument(
         "--no-save-best",

@@ -46,6 +46,7 @@ class TrainingProfileTests(unittest.TestCase):
     def test_training_catalog_is_loaded_from_split_toml(self) -> None:
         catalog = load_training_catalog()
         self.assertIn("default", catalog.profiles)
+        self.assertIn("basic_v2", catalog.profiles)
         self.assertEqual(tuple(catalog.scenarios), ("basic",))
 
     def test_project_paths_include_local_runs_directory(self) -> None:
@@ -55,7 +56,7 @@ class TrainingProfileTests(unittest.TestCase):
     def test_default_is_only_public_profile(self) -> None:
         self.assertEqual(PUBLIC_PROFILE_NAMES, ("default",))
         self.assertEqual(set(PUBLIC_PROFILE_NAMES) | set(ADVANCED_PROFILE_NAMES), set(PROFILE_NAMES))
-        self.assertEqual(ADVANCED_PROFILE_NAMES, ())
+        self.assertEqual(ADVANCED_PROFILE_NAMES, ("basic_v2",))
 
     def test_requested_timesteps_are_rounded_explicitly(self) -> None:
         profile = get_training_profile("default", requested_timesteps=8)
@@ -63,9 +64,9 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual(profile.effective_timesteps, 2048)
         self.assertTrue(profile.uses_rounded_timesteps)
 
-    def test_normal_training_defaults_to_visible_mode(self) -> None:
+    def test_normal_training_defaults_to_headless_mode(self) -> None:
         profile = get_training_profile("default")
-        self.assertTrue(profile.render)
+        self.assertFalse(profile.render)
         self.assertTrue(profile.record_video)
 
     def test_basic_scenario_uses_combat_action_preset(self) -> None:
@@ -88,12 +89,34 @@ class TrainingProfileTests(unittest.TestCase):
 
     def test_basic_scenario_defines_optimized_training_parameters(self) -> None:
         profile = get_training_profile("default")
-        self.assertEqual(profile.requested_timesteps, 750000)
+        self.assertEqual(profile.requested_timesteps, 1500000)
         self.assertEqual(profile.learning_rate, 0.0001)
         self.assertEqual(profile.n_steps, 2048)
         self.assertEqual(profile.batch_size, 128)
-        self.assertEqual(profile.n_epochs, 8)
-        self.assertEqual(profile.ent_coef, 0.005)
+        self.assertEqual(profile.n_epochs, 4)
+        self.assertEqual(profile.ent_coef, 0.01)
+        self.assertEqual(profile.checkpoint_frequency, 50000)
+        self.assertEqual(profile.eval_frequency, 25000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.video_record_frequency, 200000)
+        self.assertEqual(profile.video_length, 1000)
+
+    def test_basic_v2_only_adjusts_entropy_for_next_iteration(self) -> None:
+        default_profile = get_training_profile("default")
+        v2_profile = get_training_profile("basic_v2")
+        self.assertEqual(default_profile.ent_coef, 0.01)
+        self.assertEqual(v2_profile.ent_coef, 0.015)
+        self.assertEqual(v2_profile.learning_rate, default_profile.learning_rate)
+        self.assertEqual(v2_profile.n_steps, default_profile.n_steps)
+        self.assertEqual(v2_profile.batch_size, default_profile.batch_size)
+        self.assertEqual(v2_profile.n_epochs, default_profile.n_epochs)
+        self.assertEqual(v2_profile.action_combo_preset, default_profile.action_combo_preset)
+
+    def test_profile_roundtrip_preserves_evaluation_defaults(self) -> None:
+        profile = get_training_profile("default")
+        roundtripped = type(profile).from_dict(profile.to_dict())
+        self.assertEqual(roundtripped.eval_frequency, profile.eval_frequency)
+        self.assertEqual(roundtripped.eval_episodes, profile.eval_episodes)
 
     def test_profiles_are_valid_against_existing_scenarios(self) -> None:
         project_paths = build_project_paths()

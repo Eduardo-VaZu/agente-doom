@@ -75,7 +75,7 @@ def run_sweep(
     batch_sizes: tuple[int, ...],
     seeds: tuple[int, ...],
     eval_frequency: int | None = None,
-    eval_episodes: int = 5,
+    eval_episodes: int | None = None,
     save_best: bool = True,
 ) -> list[TrainingExecutionResult]:
     from doom_agent.services.trainer import train_profile

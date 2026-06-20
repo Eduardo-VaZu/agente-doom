@@ -233,7 +233,7 @@ def train_profile(
     resume_mode: str = AUTO_RESUME_MODE,
     from_scratch: bool = False,
     eval_frequency: int | None = None,
-    eval_episodes: int = 5,
+    eval_episodes: int | None = None,
     save_best: bool = True,
     allow_scenario_resume: bool = False,
     run_label: str | None = None,
@@ -247,9 +247,12 @@ def train_profile(
     )
 
     project_paths = build_project_paths()
-    if eval_episodes <= 0:
+    resolved_eval_frequency = profile.eval_frequency if eval_frequency is None else eval_frequency
+    resolved_eval_episodes = profile.eval_episodes if eval_episodes is None else eval_episodes
+
+    if resolved_eval_episodes <= 0:
         raise ValueError("'eval_episodes' debe ser mayor que cero.")
-    if eval_frequency is not None and eval_frequency <= 0:
+    if resolved_eval_frequency <= 0:
         raise ValueError("'eval_frequency' debe ser mayor que cero.")
 
     profile.validate(project_paths)
@@ -274,10 +277,11 @@ def train_profile(
         allow_scenario_change=allow_scenario_resume,
     )
     evaluation_settings = EvaluationSettings(
-        frequency=eval_frequency or profile.checkpoint_frequency,
-        episodes=eval_episodes,
+        frequency=resolved_eval_frequency,
+        episodes=resolved_eval_episodes,
         save_best=save_best,
         best_checkpoint_stem=project_paths.checkpoints_dir / f"{profile.checkpoint_name}_best",
+        seed=profile.seed + 1,
     )
 
     final_checkpoint_stem = project_paths.checkpoints_dir / profile.checkpoint_name
@@ -382,6 +386,7 @@ def train_profile(
             resume_source=resume_state.resume_source,
             resume_saved_timesteps=resume_state.resume_saved_timesteps,
             evaluation_metrics=callback.last_evaluation_metrics,
+            evaluation_history=callback.evaluation_history,
             duration_seconds=duration_seconds,
             stopped_early=callback.early_stopping.stopped,
             stop_reason=callback.early_stopping.stop_reason,
@@ -425,7 +430,7 @@ def train(
     resume_mode: str = AUTO_RESUME_MODE,
     from_scratch: bool = False,
     eval_frequency: int | None = None,
-    eval_episodes: int = 5,
+    eval_episodes: int | None = None,
     save_best: bool = True,
     allow_scenario_resume: bool = False,
 ) -> TrainingExecutionResult:

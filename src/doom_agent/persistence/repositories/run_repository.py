@@ -214,6 +214,7 @@ class TrainingRunRepository:
                     RunArtifact.artifact_type.in_(
                         (
                             ArtifactType.CHECKPOINT.value,
+                            ArtifactType.REPORT.value,
                             ArtifactType.VIDEO.value,
                         )
                     ),

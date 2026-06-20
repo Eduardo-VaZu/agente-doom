@@ -37,6 +37,8 @@ class TrainingProfilePayload(TypedDict, total=False):
     checkpoint_name: str
     tensorboard_run_name: str
     checkpoint_frequency: int
+    eval_frequency: int
+    eval_episodes: int
     video_record_frequency: int
     video_length: int
     frame_stack: int
@@ -59,6 +61,30 @@ class EvaluationMetricsPayload(TypedDict):
     std_reward: float
     mean_episode_length: float
     episodes: int
+
+
+class EvaluationActionUsagePayload(TypedDict):
+    label: str
+    count: int
+    percentage: float
+
+
+class EvaluationHistoryEntryPayload(TypedDict):
+    step: int
+    mean_reward: float
+    std_reward: float
+    mean_episode_length: float
+    episodes: int
+    top_actions: list[EvaluationActionUsagePayload]
+
+
+class EvaluationSummaryPayload(TypedDict):
+    checkpoint_path: str
+    scenario_key: str
+    scenario_name: str
+    deterministic: bool
+    render: bool
+    metrics: EvaluationMetricsPayload
 
 
 class CheckpointMetadataPayload(TypedDict):
@@ -98,6 +124,7 @@ class TrainingRunReportPayload(TypedDict):
     resume_source: str | None
     resume_saved_timesteps: int | None
     evaluation_metrics: EvaluationMetricsPayload | None
+    evaluation_history: list[EvaluationHistoryEntryPayload]
     duration_seconds: float
     stopped_early: bool
     stop_reason: str | None
@@ -142,6 +169,8 @@ class LegacyConfigPayload(TypedDict, total=False):
     save_name: str
     tb_log_name: str
     checkpoint_freq: int
+    eval_frequency: int
+    eval_episodes: int
     video_record_frequency: int
     video_length: int
     frame_stack: int

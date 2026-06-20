@@ -24,6 +24,8 @@ def make_doom_env(config: LegacyConfigPayload, record: bool = False) -> VecEnv:
         "save_name": config.get("save_name", "doom_foundation_agent"),
         "tb_log_name": config.get("tb_log_name", "Doom_Foundation_Agent"),
         "checkpoint_freq": config.get("checkpoint_freq", 25000),
+        "eval_frequency": config.get("eval_frequency", config.get("checkpoint_freq", 25000)),
+        "eval_episodes": config.get("eval_episodes", 5),
         "video_record_frequency": config.get(
             "video_record_frequency",
             config.get("checkpoint_freq", 25000),
@@ -58,6 +60,11 @@ def make_doom_env(config: LegacyConfigPayload, record: bool = False) -> VecEnv:
         "checkpoint_name": profile_payload.get("save_name", "doom_foundation_agent"),
         "tensorboard_run_name": profile_payload.get("tb_log_name", "Doom_Foundation_Agent"),
         "checkpoint_frequency": profile_payload.get("checkpoint_freq", 25000),
+        "eval_frequency": profile_payload.get(
+            "eval_frequency",
+            profile_payload.get("checkpoint_freq", 25000),
+        ),
+        "eval_episodes": profile_payload.get("eval_episodes", 5),
         "video_record_frequency": profile_payload.get(
             "video_record_frequency",
             profile_payload.get("checkpoint_freq", 25000),

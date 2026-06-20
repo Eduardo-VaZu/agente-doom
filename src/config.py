@@ -32,6 +32,8 @@ def _profile_to_legacy_config(profile: TrainingProfile) -> LegacyConfigPayload:
         "save_name": profile.checkpoint_name,
         "tb_log_name": profile.tensorboard_run_name,
         "checkpoint_freq": profile.checkpoint_frequency,
+        "eval_frequency": profile.eval_frequency,
+        "eval_episodes": profile.eval_episodes,
         "video_record_frequency": profile.video_record_frequency,
         "video_length": profile.video_length,
         "frame_stack": profile.frame_stack,

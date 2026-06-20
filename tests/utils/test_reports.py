@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import unittest
@@ -54,12 +55,34 @@ class ReportTests(unittest.TestCase):
             duration_seconds=12.5,
             stopped_early=False,
             stop_reason=None,
+            evaluation_history=[
+                {
+                    "step": 25000,
+                    "mean_reward": 10.0,
+                    "std_reward": 1.0,
+                    "mean_episode_length": 30.0,
+                    "episodes": 5,
+                    "top_actions": [
+                        {
+                            "label": "ATTACK",
+                            "count": 100,
+                            "percentage": 50.0,
+                        }
+                    ],
+                }
+            ],
         )
 
         try:
             report_path = save_training_run_report(project_paths, report)
             self.assertTrue(report_path.exists())
             self.assertEqual(report_path, report_path_for_run(project_paths, run_id))
+            saved_report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(saved_report["evaluation_history"][0]["step"], 25000)
+            self.assertEqual(
+                saved_report["evaluation_history"][0]["top_actions"][0]["label"],
+                "ATTACK",
+            )
 
             with patch("doom_agent.utils.reports.has_explicit_database_url", return_value=False):
                 runs = list_experiment_runs(project_paths)

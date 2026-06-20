@@ -232,9 +232,12 @@ def main() -> None:
         evaluate(
             checkpoint_name=args.checkpoint,
             steps=args.steps,
+            episodes=args.episodes,
             profile_name=args.config,
             checkpoint_selection=args.select,
             scenario_name=args.scenario,
+            render=not args.no_render,
+            json_output=args.json_output,
         )
         return
 

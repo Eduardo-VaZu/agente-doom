@@ -15,7 +15,11 @@ from doom_agent.config.schema import TrainingProfile
 from doom_agent.models import build_recurrent_ppo_model
 from doom_agent.services.early_stopping import EarlyStoppingTracker
 from doom_agent.services.resume import ResumeState
-from doom_agent.shared.contracts import EvaluationMetricsPayload
+from doom_agent.shared.contracts import (
+    EvaluationActionUsagePayload,
+    EvaluationHistoryEntryPayload,
+    EvaluationMetricsPayload,
+)
 from doom_agent.utils.checkpoints import (
     build_checkpoint_metadata,
     checkpoint_zip_path,
@@ -32,6 +36,7 @@ class EvaluationSettings:
     episodes: int
     save_best: bool
     best_checkpoint_stem: Path
+    seed: int
 
 
 def _next_multiple(current_timesteps: int, frequency: int) -> int:
@@ -69,6 +74,45 @@ def load_best_mean_reward(best_checkpoint_stem: Path) -> float:
     return float(evaluation_metrics["mean_reward"])
 
 
+def build_evaluation_metrics(
+    rewards: list[float],
+    lengths: list[int],
+    *,
+    episodes: int,
+) -> EvaluationMetricsPayload:
+    return {
+        "mean_reward": float(np.mean(rewards)),
+        "std_reward": float(np.std(rewards)),
+        "mean_episode_length": float(np.mean(lengths)),
+        "episodes": episodes,
+    }
+
+
+def summarize_action_usage(
+    action_counts: Counter[int],
+    action_labels: tuple[str, ...],
+    *,
+    limit: int = 5,
+) -> list[EvaluationActionUsagePayload]:
+    total = sum(action_counts.values())
+    if total <= 0:
+        return []
+
+    top_actions: list[EvaluationActionUsagePayload] = []
+    for action_index, count in action_counts.most_common(limit):
+        label = action_labels[action_index] if 0 <= action_index < len(action_labels) else str(
+            action_index
+        )
+        top_actions.append(
+            {
+                "label": label,
+                "count": count,
+                "percentage": (count / total) * 100,
+            }
+        )
+    return top_actions
+
+
 class PeriodicTrainingCallback(BaseCallback):
     def __init__(
         self,
@@ -97,6 +141,7 @@ class PeriodicTrainingCallback(BaseCallback):
         )
         self.best_checkpoint_updated = False
         self.last_evaluation_metrics: EvaluationMetricsPayload | None = None
+        self.evaluation_history: list[EvaluationHistoryEntryPayload] = []
         self.action_counts: Counter[int] = Counter()
         self.action_labels: tuple[str, ...] = ()
 
@@ -125,6 +170,7 @@ class PeriodicTrainingCallback(BaseCallback):
         self.eval_env.close()
 
     def _run_periodic_evaluation(self) -> None:
+        self.eval_env.seed(self.evaluation_settings.seed)
         rewards, lengths = cast(
             tuple[list[float], list[int]],
             evaluate_policy(
@@ -136,15 +182,25 @@ class PeriodicTrainingCallback(BaseCallback):
                 warn=False,
             ),
         )
-        mean_reward = float(np.mean(rewards))
-        std_reward = float(np.std(rewards))
-        mean_length = float(np.mean(lengths))
-        self.last_evaluation_metrics = {
-            "mean_reward": mean_reward,
-            "std_reward": std_reward,
-            "mean_episode_length": mean_length,
-            "episodes": self.evaluation_settings.episodes,
-        }
+        self.last_evaluation_metrics = build_evaluation_metrics(
+            rewards,
+            lengths,
+            episodes=self.evaluation_settings.episodes,
+        )
+        mean_reward = self.last_evaluation_metrics["mean_reward"]
+        std_reward = self.last_evaluation_metrics["std_reward"]
+        mean_length = self.last_evaluation_metrics["mean_episode_length"]
+        action_usage = self._consume_action_usage()
+        self.evaluation_history.append(
+            {
+                "step": self.num_timesteps,
+                "mean_reward": mean_reward,
+                "std_reward": std_reward,
+                "mean_episode_length": mean_length,
+                "episodes": self.evaluation_settings.episodes,
+                "top_actions": action_usage,
+            }
+        )
         self.logger.record("eval/mean_reward", mean_reward)
         self.logger.record("eval/std_reward", std_reward)
         self.logger.record("eval/mean_episode_length", mean_length)
@@ -161,7 +217,7 @@ class PeriodicTrainingCallback(BaseCallback):
                     ("best_reward", self.best_mean_reward),
                 ],
             )
-        self._print_action_usage()
+        self._print_action_usage(action_usage)
 
         improved = self.early_stopping.register(mean_reward)
         self.best_mean_reward = self.early_stopping.best_mean_reward
@@ -223,7 +279,6 @@ class PeriodicTrainingCallback(BaseCallback):
                     ("path", format_path_tail(checkpoint_stem.with_suffix(".zip"))),
                 ],
             )
-        self._print_action_usage()
 
     def _load_action_labels(self) -> tuple[str, ...]:
         if self.profile.action_space_kind != "button_combinations":
@@ -249,20 +304,19 @@ class PeriodicTrainingCallback(BaseCallback):
         for action_index in np.asarray(actions).reshape(-1):
             self.action_counts[int(action_index)] += 1
 
-    def _print_action_usage(self) -> None:
-        if not self.verbose or not self.action_counts:
+    def _consume_action_usage(self) -> list[EvaluationActionUsagePayload]:
+        action_usage = summarize_action_usage(self.action_counts, self.action_labels)
+        self.action_counts.clear()
+        return action_usage
+
+    def _print_action_usage(self, action_usage: list[EvaluationActionUsagePayload]) -> None:
+        if not self.verbose or not action_usage:
             return
 
-        total = sum(self.action_counts.values())
-        top_actions = []
-        for action_index, count in self.action_counts.most_common(5):
-            label = (
-                self.action_labels[action_index]
-                if 0 <= action_index < len(self.action_labels)
-                else str(action_index)
-            )
-            percentage = (count / total) * 100
-            top_actions.append(f"{label}={count} ({percentage:.1f}%)")
-
-        print_block("Recent Actions", top_actions)
-        self.action_counts.clear()
+        print_block(
+            "Recent Actions",
+            [
+                f"{entry['label']}={entry['count']} ({entry['percentage']:.1f}%)"
+                for entry in action_usage
+            ],
+        )
