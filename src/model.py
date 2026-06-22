@@ -14,6 +14,7 @@ def _legacy_config_to_profile(config: LegacyConfigPayload) -> TrainingProfile:
         "scenario_name": config.get("env_name", "basic.cfg"),
         "learning_rate": config.get("learning_rate", 1e-4),
         "n_steps": config.get("n_steps", 2048),
+        "num_envs": config.get("num_envs", 1),
         "batch_size": config.get("batch_size", 128),
         "n_epochs": config.get("n_epochs", 8),
         "gamma": config.get("gamma", 0.99),

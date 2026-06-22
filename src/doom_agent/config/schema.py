@@ -136,6 +136,7 @@ class TrainingProfile:
     scenario_name: str
     learning_rate: float
     n_steps: int
+    num_envs: int
     batch_size: int
     n_epochs: int
     gamma: float
@@ -164,8 +165,12 @@ class TrainingProfile:
     curriculum: tuple[CurriculumStageConfig, ...] = ()
 
     @property
+    def rollout_size(self) -> int:
+        return self.n_steps * self.num_envs
+
+    @property
     def effective_timesteps(self) -> int:
-        return ceil(self.requested_timesteps / self.n_steps) * self.n_steps
+        return ceil(self.requested_timesteps / self.rollout_size) * self.rollout_size
 
     @property
     def uses_rounded_timesteps(self) -> bool:
@@ -173,6 +178,12 @@ class TrainingProfile:
 
     def with_timesteps(self, requested_timesteps: int) -> TrainingProfile:
         return replace(self, requested_timesteps=requested_timesteps)
+
+    def with_n_steps(self, n_steps: int) -> TrainingProfile:
+        return replace(self, n_steps=n_steps)
+
+    def with_num_envs(self, num_envs: int) -> TrainingProfile:
+        return replace(self, num_envs=num_envs)
 
     def with_seed(self, seed: int) -> TrainingProfile:
         return replace(self, seed=seed)
@@ -185,7 +196,7 @@ class TrainingProfile:
         )
 
     def for_evaluation(self, render: bool = True) -> TrainingProfile:
-        return replace(self, render=render, record_video=False)
+        return replace(self, render=render, record_video=False, num_envs=1)
 
     def scenario_path(self, paths: ProjectPaths) -> Path:
         return paths.scenarios_dir / self.scenario_name
@@ -194,6 +205,7 @@ class TrainingProfile:
         positive_fields = {
             "learning_rate": self.learning_rate,
             "n_steps": self.n_steps,
+            "num_envs": self.num_envs,
             "batch_size": self.batch_size,
             "n_epochs": self.n_epochs,
             "gamma": self.gamma,
@@ -213,8 +225,8 @@ class TrainingProfile:
             if value <= 0:
                 raise ValueError(f"'{field_name}' debe ser mayor que cero.")
 
-        if self.batch_size > self.n_steps:
-            raise ValueError("'batch_size' no puede ser mayor que 'n_steps'.")
+        if self.batch_size > self.rollout_size:
+            raise ValueError("'batch_size' no puede ser mayor que 'n_steps * num_envs'.")
 
         if not 0 <= self.ent_coef:
             raise ValueError("'ent_coef' no puede ser negativo.")
@@ -258,6 +270,7 @@ class TrainingProfile:
             "scenario_name": self.scenario_name,
             "learning_rate": self.learning_rate,
             "n_steps": self.n_steps,
+            "num_envs": self.num_envs,
             "batch_size": self.batch_size,
             "n_epochs": self.n_epochs,
             "gamma": self.gamma,
@@ -294,6 +307,7 @@ class TrainingProfile:
             "scenario_key": self.scenario_key,
             "learning_rate": self.learning_rate,
             "n_steps": self.n_steps,
+            "num_envs": self.num_envs,
             "batch_size": self.batch_size,
             "n_epochs": self.n_epochs,
             "gamma": self.gamma,
@@ -351,6 +365,7 @@ class TrainingProfile:
             scenario_name=payload["scenario_name"],
             learning_rate=payload["learning_rate"],
             n_steps=payload["n_steps"],
+            num_envs=payload.get("num_envs", 1),
             batch_size=payload["batch_size"],
             n_epochs=payload["n_epochs"],
             gamma=payload["gamma"],

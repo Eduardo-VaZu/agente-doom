@@ -5,6 +5,7 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
+from unittest.mock import MagicMock, patch
 
 import gymnasium as gym
 import numpy as np
@@ -134,3 +135,20 @@ class EnvironmentSmokeTests(unittest.TestCase):
             )
         finally:
             env.close()
+
+    def test_multi_env_uses_subproc_vec_env(self) -> None:
+        project_paths = build_project_paths()
+        profile = replace(get_training_profile("default"), num_envs=2, record_video=False)
+        monitored_env = MagicMock()
+        stacked_env = MagicMock()
+
+        with (
+            patch("doom_agent.envs.doom_env.SubprocVecEnv", return_value=monitored_env) as subproc,
+            patch("doom_agent.envs.doom_env.VecMonitor", return_value=monitored_env),
+            patch("doom_agent.envs.doom_env.VecFrameStack", return_value=stacked_env),
+        ):
+            env = make_vectorized_env(profile, project_paths)
+
+        self.assertIs(env, stacked_env)
+        env_fns = subproc.call_args.args[0]
+        self.assertEqual(len(env_fns), 2)

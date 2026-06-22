@@ -26,6 +26,7 @@ class TrainingProfilePayload(TypedDict, total=False):
     scenario_name: str
     learning_rate: float
     n_steps: int
+    num_envs: int
     batch_size: int
     n_epochs: int
     gamma: float
@@ -254,6 +255,7 @@ class LegacyConfigPayload(TypedDict, total=False):
     env_name: str
     learning_rate: float
     n_steps: int
+    num_envs: int
     batch_size: int
     n_epochs: int
     gamma: float

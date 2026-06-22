@@ -79,6 +79,14 @@ class TrainingProfileTests(unittest.TestCase):
         custom_profile = get_training_profile("default", seed=123)
         self.assertEqual(default_profile.seed, 42)
         self.assertEqual(custom_profile.seed, 123)
+        self.assertEqual(default_profile.num_envs, 1)
+
+    def test_profile_supports_num_envs_and_n_steps_override(self) -> None:
+        profile = get_training_profile("default", requested_timesteps=300, n_steps=64, num_envs=2)
+        self.assertEqual(profile.n_steps, 64)
+        self.assertEqual(profile.num_envs, 2)
+        self.assertEqual(profile.rollout_size, 128)
+        self.assertEqual(profile.effective_timesteps, 384)
 
     def test_basic_scenario_defines_optimized_training_parameters(self) -> None:
         profile = get_training_profile("default")
@@ -99,6 +107,7 @@ class TrainingProfileTests(unittest.TestCase):
         roundtripped = type(profile).from_dict(profile.to_dict())
         self.assertEqual(roundtripped.eval_frequency, profile.eval_frequency)
         self.assertEqual(roundtripped.eval_episodes, profile.eval_episodes)
+        self.assertEqual(roundtripped.num_envs, profile.num_envs)
 
     def test_profiles_are_valid_against_existing_scenarios(self) -> None:
         project_paths = build_project_paths()

@@ -22,6 +22,18 @@ def add_train_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         help="Sobrescribe los timesteps solicitados para esta ejecucion.",
     )
     parser.add_argument(
+        "--n-steps",
+        type=int,
+        default=None,
+        help="Sobrescribe pasos por rollout y cambia el redondeo efectivo del entrenamiento.",
+    )
+    parser.add_argument(
+        "--num-envs",
+        type=int,
+        default=None,
+        help="Cantidad de entornos en paralelo. `1` usa DummyVecEnv; mayor a `1` usa SubprocVecEnv.",
+    )
+    parser.add_argument(
         "--scenario",
         choices=SCENARIO_NAMES,
         default=None,
@@ -100,6 +112,8 @@ def main() -> None:
         requested_timesteps=args.timesteps,
         scenario_name=args.scenario,
         seed=args.seed,
+        n_steps=args.n_steps,
+        num_envs=args.num_envs,
         resume_mode=args.resume,
         from_scratch=args.from_scratch,
         eval_frequency=args.eval_freq,

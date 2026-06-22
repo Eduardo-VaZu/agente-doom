@@ -7,6 +7,8 @@ CLI := src\cli.py
 
 SCENARIO ?= basic
 TIMESTEPS ?=
+N_STEPS ?=
+NUM_ENVS ?=
 SEED ?=
 RESUME ?= auto
 CHECKPOINT ?=
@@ -25,7 +27,7 @@ NO_RENDER ?= 0
 ONLY ?= both
 PROMOTE_EPISODES ?= 50
 
-TRAIN_FLAGS = --scenario $(SCENARIO) $(if $(TIMESTEPS),--timesteps $(TIMESTEPS),) $(if $(SEED),--seed $(SEED),) $(if $(RESUME),--resume $(RESUME),) $(if $(EVAL_FREQ),--eval-freq $(EVAL_FREQ),) $(if $(EVAL_EPISODES),--eval-episodes $(EVAL_EPISODES),) $(if $(filter 1 true yes,$(FROM_SCRATCH)),--from-scratch,) $(if $(filter 1 true yes,$(ALLOW_SCENARIO_RESUME)),--allow-scenario-resume,) $(if $(filter 1 true yes,$(NO_SAVE_BEST)),--no-save-best,)
+TRAIN_FLAGS = --scenario $(SCENARIO) $(if $(TIMESTEPS),--timesteps $(TIMESTEPS),) $(if $(N_STEPS),--n-steps $(N_STEPS),) $(if $(NUM_ENVS),--num-envs $(NUM_ENVS),) $(if $(SEED),--seed $(SEED),) $(if $(RESUME),--resume $(RESUME),) $(if $(EVAL_FREQ),--eval-freq $(EVAL_FREQ),) $(if $(EVAL_EPISODES),--eval-episodes $(EVAL_EPISODES),) $(if $(filter 1 true yes,$(FROM_SCRATCH)),--from-scratch,) $(if $(filter 1 true yes,$(ALLOW_SCENARIO_RESUME)),--allow-scenario-resume,) $(if $(filter 1 true yes,$(NO_SAVE_BEST)),--no-save-best,)
 EVALUATE_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT) $(if $(STEPS),--steps $(STEPS),) $(if $(EPISODES),--episodes $(EPISODES),) $(if $(filter 1 true yes,$(NO_RENDER)),--no-render,) $(if $(filter 1 true yes,$(JSON)),--json,)
 INSPECT_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT)
 PROMOTE_FLAGS = $(if $(CHECKPOINT),--checkpoint $(CHECKPOINT),--scenario $(SCENARIO)) --select $(SELECT) --episodes $(PROMOTE_EPISODES)
@@ -81,6 +83,8 @@ help:
 	@echo "Variables utiles:"
 	@echo "  SCENARIO=basic"
 	@echo "  TIMESTEPS=1500000"
+	@echo "  N_STEPS=2048"
+	@echo "  NUM_ENVS=1"
 	@echo "  SEED=42"
 	@echo "  STEPS=2000"
 	@echo "  EPISODES=50"

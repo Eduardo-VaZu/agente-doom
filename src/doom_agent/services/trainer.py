@@ -181,7 +181,9 @@ def print_training_summary(
             ("scenario_file", profile.scenario_name),
             ("seed", profile.seed),
             ("action_space", profile.action_space_kind),
+            ("num_envs", profile.num_envs),
             ("frame_stack", profile.frame_stack),
+            ("rollout_size", profile.rollout_size),
             ("requested_steps", profile.requested_timesteps),
             ("effective_steps", profile.effective_timesteps),
             ("checkpoint_every", profile.checkpoint_frequency),
@@ -204,8 +206,12 @@ def print_training_summary(
         print_block(
             "Timesteps Note",
             [
-                "Stable-Baselines3 redondea al siguiente multiplo de n_steps.",
-                f"n_steps={profile.n_steps} -> se ejecutaran {profile.effective_timesteps} pasos.",
+                "Stable-Baselines3 redondea al siguiente rollout completo.",
+                (
+                    f"n_steps={profile.n_steps}, num_envs={profile.num_envs} "
+                    f"-> rollout={profile.rollout_size} -> se ejecutaran "
+                    f"{profile.effective_timesteps} pasos."
+                ),
             ],
         )
 
@@ -529,6 +535,8 @@ def train(
     requested_timesteps: int | None = None,
     scenario_name: str | None = None,
     seed: int | None = None,
+    n_steps: int | None = None,
+    num_envs: int | None = None,
     *,
     resume_mode: str = AUTO_RESUME_MODE,
     from_scratch: bool = False,
@@ -542,6 +550,8 @@ def train(
         requested_timesteps=requested_timesteps,
         scenario_name=scenario_name,
         seed=seed,
+        n_steps=n_steps,
+        num_envs=num_envs,
     )
     if profile.curriculum:
         if scenario_name is not None:
@@ -552,6 +562,8 @@ def train(
             profile_name=profile_name,
             requested_timesteps=requested_timesteps,
             seed=seed,
+            n_steps=n_steps,
+            num_envs=num_envs,
         )
         print(f"Ejecutando curriculum de {len(stages)} etapas.")
         stage_resume_mode = resume_mode

@@ -173,6 +173,8 @@ def _materialize_profile(
     requested_timesteps: int | None = None,
     scenario_name: str | None = None,
     seed: int | None = None,
+    n_steps: int | None = None,
+    num_envs: int | None = None,
 ) -> TrainingProfile:
     catalog = load_training_catalog()
     profile_settings = _get_profile_settings(profile_name)
@@ -206,6 +208,10 @@ def _materialize_profile(
     profile = TrainingProfile.from_dict(cast(TrainingProfilePayload, merged))
     if requested_timesteps is not None:
         profile = profile.with_timesteps(requested_timesteps)
+    if n_steps is not None:
+        profile = profile.with_n_steps(n_steps)
+    if num_envs is not None:
+        profile = profile.with_num_envs(num_envs)
     if seed is not None:
         profile = profile.with_seed(seed)
     return profile
@@ -216,12 +222,16 @@ def get_training_profile(
     requested_timesteps: int | None = None,
     scenario_name: str | None = None,
     seed: int | None = None,
+    n_steps: int | None = None,
+    num_envs: int | None = None,
 ) -> TrainingProfile:
     return _materialize_profile(
         profile_name=profile_name,
         requested_timesteps=requested_timesteps,
         scenario_name=scenario_name,
         seed=seed,
+        n_steps=n_steps,
+        num_envs=num_envs,
     )
 
 
@@ -229,12 +239,16 @@ def materialize_curriculum_profiles(
     profile_name: str = DEFAULT_PROFILE_NAME,
     requested_timesteps: int | None = None,
     seed: int | None = None,
+    n_steps: int | None = None,
+    num_envs: int | None = None,
 ) -> list[TrainingProfile]:
     base_profile = _materialize_profile(
         profile_name=profile_name,
         requested_timesteps=requested_timesteps,
         scenario_name=None,
         seed=seed,
+        n_steps=n_steps,
+        num_envs=num_envs,
     )
     if not base_profile.curriculum:
         return [base_profile]
@@ -247,6 +261,8 @@ def materialize_curriculum_profiles(
             requested_timesteps=requested_timesteps,
             scenario_name=stage.scenario_key,
             seed=base_profile.seed + stage_index,
+            n_steps=n_steps,
+            num_envs=num_envs,
         )
         if stage.requested_timesteps is not None:
             stage_profile = stage_profile.with_timesteps(stage.requested_timesteps)
@@ -255,6 +271,8 @@ def materialize_curriculum_profiles(
                 profile_name=DEFAULT_PROFILE_NAME,
                 scenario_name=stage.scenario_key,
                 seed=base_profile.seed + stage_index,
+                n_steps=n_steps,
+                num_envs=num_envs,
             )
             stage_profile = stage_profile.with_timesteps(
                 scenario_default_profile.requested_timesteps

@@ -9,6 +9,7 @@ frame_stack = 4
 screen_width = 84
 screen_height = 84
 seed = 42
+num_envs = 1
 action_space_kind = "button_combinations"
 
 # Reward shaping base compartido; cada escenario puede overridearlo si hace falta.

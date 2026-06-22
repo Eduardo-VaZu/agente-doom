@@ -364,6 +364,8 @@ def main() -> None:
             requested_timesteps=args.timesteps,
             scenario_name=args.scenario,
             seed=args.seed,
+            n_steps=args.n_steps,
+            num_envs=args.num_envs,
             resume_mode=args.resume,
             from_scratch=args.from_scratch,
             eval_frequency=args.eval_freq,

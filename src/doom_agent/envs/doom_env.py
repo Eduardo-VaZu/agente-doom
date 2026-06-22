@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 import cv2
 import gymnasium as gym
@@ -10,6 +11,7 @@ import vizdoom as zd
 from gymnasium.core import RenderFrame
 from stable_baselines3.common.vec_env import (
     DummyVecEnv,
+    SubprocVecEnv,
     VecEnv,
     VecFrameStack,
     VecMonitor,
@@ -18,6 +20,7 @@ from stable_baselines3.common.vec_env import (
 
 from doom_agent.config.schema import ProjectPaths, TrainingProfile
 from doom_agent.envs.reward import RewardShaper
+from doom_agent.shared.contracts import TrainingProfilePayload
 from doom_agent.shared.types import AgentAction, BinaryAction, Observation
 from doom_agent.utils.filesystem import ensure_directories
 
@@ -240,11 +243,16 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         )
 
 
-def build_doom_game(profile: TrainingProfile, project_paths: ProjectPaths) -> zd.DoomGame:
+def build_doom_game(
+    profile: TrainingProfile,
+    project_paths: ProjectPaths,
+    *,
+    seed: int | None = None,
+) -> zd.DoomGame:
     scenario_path = profile.scenario_path(project_paths)
     game = zd.DoomGame()
     game.load_config(str(Path(scenario_path)))
-    game.set_seed(profile.seed)
+    game.set_seed(profile.seed if seed is None else seed)
     game.set_window_visible(profile.render)
     game.set_screen_format(zd.ScreenFormat.RGB24)
     game.set_screen_resolution(zd.ScreenResolution.RES_320X240)
@@ -256,25 +264,55 @@ def should_record_video(step: int, frequency: int) -> bool:
     return step == 0 or step % frequency == 0
 
 
+def build_doom_env(
+    profile_payload: TrainingProfilePayload,
+    project_paths: ProjectPaths,
+    *,
+    seed: int,
+) -> DoomEnv:
+    profile = TrainingProfile.from_dict(profile_payload)
+    game = build_doom_game(profile, project_paths, seed=seed)
+    return DoomEnv(
+        game=game,
+        observation_width=profile.screen_width,
+        observation_height=profile.screen_height,
+        action_space_kind=profile.action_space_kind,
+        action_combo_preset=profile.action_combo_preset,
+        render_mode="rgb_array",
+        reward_shaper=RewardShaper(profile.reward_shaping),
+    )
+
+
+def build_env_factory(
+    profile: TrainingProfile,
+    project_paths: ProjectPaths,
+    *,
+    env_index: int,
+) -> Callable[[], DoomEnv]:
+    profile_payload = profile.to_dict()
+    return partial(
+        build_doom_env,
+        profile_payload,
+        project_paths,
+        seed=profile.seed + env_index,
+    )
+
+
 def make_vectorized_env(
     profile: TrainingProfile,
     project_paths: ProjectPaths,
     *,
     video_dir: Path | None = None,
 ) -> VecEnv:
-    def _build_env() -> DoomEnv:
-        game = build_doom_game(profile, project_paths)
-        return DoomEnv(
-            game=game,
-            observation_width=profile.screen_width,
-            observation_height=profile.screen_height,
-            action_space_kind=profile.action_space_kind,
-            action_combo_preset=profile.action_combo_preset,
-            render_mode="rgb_array",
-            reward_shaper=RewardShaper(profile.reward_shaping),
-        )
-
-    env: VecEnv = DummyVecEnv([_build_env])
+    env_fns = [
+        build_env_factory(profile, project_paths, env_index=env_index)
+        for env_index in range(profile.num_envs)
+    ]
+    env: VecEnv
+    if profile.num_envs == 1:
+        env = DummyVecEnv(env_fns)
+    else:
+        env = SubprocVecEnv(env_fns)
     env = VecMonitor(env)
     env = VecFrameStack(env, n_stack=profile.frame_stack)
 
