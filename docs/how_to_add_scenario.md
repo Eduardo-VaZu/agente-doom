@@ -43,8 +43,8 @@ clip_max = 1.0
 
 4. Documenta prioridad y rol del escenario
   - actualiza `docs/vizdoom_escenarios_oficiales.md`
-  - si entra a curriculum, documenta orden en `docs/roadmap_curriculum.md`
-  - actualiza estado en `docs/scenario_registry.md`
+  - si entra a curriculum, documenta orden en `docs/plan_escenarios.md`
+  - actualiza estado en `docs/plan_escenarios.md`
   - registra trabajo relevante en `docs/experiment_log.md`
 
 ## Regla

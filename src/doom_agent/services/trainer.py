@@ -18,15 +18,17 @@ from doom_agent.services.resume import AUTO_RESUME_MODE
 from doom_agent.shared.contracts import TrainingRunReportPayload
 from doom_agent.storage import build_run_artifact_paths, has_explicit_remote_storage_config
 from doom_agent.utils.checkpoints import (
-    best_checkpoint_stem,
     build_checkpoint_metadata,
     checkpoint_zip_path,
     copy_checkpoint_bundle,
+    list_matching_checkpoints,
     save_checkpoint_bundle,
+    select_latest_checkpoint,
 )
 from doom_agent.utils.console import print_block, print_kv_block
 from doom_agent.utils.filesystem import ensure_directories
 from doom_agent.utils.formatting import format_path_tail
+from doom_agent.utils.manifests import build_run_manifest, save_run_manifest
 from doom_agent.utils.reports import (
     build_run_id,
     build_training_run_report,
@@ -35,6 +37,7 @@ from doom_agent.utils.reports import (
 
 if TYPE_CHECKING:
     from doom_agent.services.resume import ResumeState
+    from doom_agent.services.sync import SyncRunResult
     from doom_agent.services.training_support import EvaluationSettings
 
 
@@ -42,6 +45,7 @@ def _resolve_vizdoom_exit_exception() -> type[Exception]:
     try:
         from vizdoom import ViZDoomUnexpectedExitException as resolved_exception
     except ModuleNotFoundError:  # pragma: no cover - only used in lightweight test environments
+
         class FallbackViZDoomUnexpectedExitException(Exception):
             pass
 
@@ -53,6 +57,7 @@ def _resolve_vizdoom_exit_exception() -> type[Exception]:
 ViZDoomUnexpectedExitException = _resolve_vizdoom_exit_exception()
 
 
+# Guarda metadata final de la corrida sin bloquear el entrenamiento si DB falla.
 def _persist_run_report_to_database(
     report: TrainingRunReportPayload,
     report_path: Path,
@@ -73,9 +78,10 @@ def _persist_run_report_to_database(
         )
 
 
-def _sync_run_artifacts_to_remote(run_id: str) -> None:
+# Intenta cerrar la corrida subiendo artefactos a S3, pero deja la corrida local intacta si falla.
+def _sync_run_artifacts_to_remote(run_id: str) -> SyncRunResult | None:
     if not has_explicit_remote_storage_config():
-        return
+        return None
 
     from doom_agent.services.sync import ArtifactSyncService
 
@@ -85,15 +91,15 @@ def _sync_run_artifacts_to_remote(run_id: str) -> None:
         print_block(
             "Sync Warning",
             [
-                "No se pudo sincronizar artefactos con MinIO.",
+                "No se pudo sincronizar artefactos con S3.",
                 f"error={type(error).__name__}: {error}",
                 "Artefactos locales siguen disponibles.",
             ],
         )
-        return
+        return None
 
     if result.attempted_count == 0:
-        return
+        return result
     print_kv_block(
         "Artifact Sync",
         [
@@ -104,24 +110,36 @@ def _sync_run_artifacts_to_remote(run_id: str) -> None:
             ("status", result.final_status),
         ],
     )
+    return result
 
 
 def copy_run_best_checkpoint_if_updated(
-    final_checkpoint_stem: Path,
     run_best_checkpoint_stem: Path,
+    official_best_checkpoint_stem: Path,
     *,
     best_checkpoint_updated: bool,
 ) -> Path | None:
     if not best_checkpoint_updated:
         return None
 
-    current_best_checkpoint_stem = best_checkpoint_stem(final_checkpoint_stem)
-    current_best_checkpoint_path = checkpoint_zip_path(current_best_checkpoint_stem)
+    current_best_checkpoint_path = checkpoint_zip_path(run_best_checkpoint_stem)
     if not current_best_checkpoint_path.exists():
         return None
 
-    copy_checkpoint_bundle(current_best_checkpoint_stem, run_best_checkpoint_stem)
+    copy_checkpoint_bundle(run_best_checkpoint_stem, official_best_checkpoint_stem)
     return current_best_checkpoint_path
+
+
+def select_auto_checkpoints_for_sync(
+    auto_checkpoint_dir: Path,
+    checkpoint_name: str,
+) -> list[Path]:
+    latest_auto_checkpoint = select_latest_checkpoint(
+        list_matching_checkpoints(auto_checkpoint_dir, checkpoint_name)
+    )
+    if latest_auto_checkpoint is None:
+        return []
+    return [checkpoint_zip_path(latest_auto_checkpoint.checkpoint_stem)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +147,7 @@ class TrainingExecutionResult:
     profile_name: str
     profile: TrainingProfile
     final_checkpoint_path: Path
+    best_checkpoint_path: Path | None
     report_path: Path
     training_status: str
     completed: bool
@@ -138,17 +157,16 @@ class TrainingExecutionResult:
 
 
 def select_resume_checkpoint_path(result: TrainingExecutionResult) -> Path:
-    final_checkpoint_stem = result.final_checkpoint_path.with_suffix("")
-    best_checkpoint_path = checkpoint_zip_path(best_checkpoint_stem(final_checkpoint_stem))
-    if best_checkpoint_path.exists():
-        return best_checkpoint_path
+    if result.best_checkpoint_path is not None:
+        return result.best_checkpoint_path
     return result.final_checkpoint_path
 
 
 def print_training_summary(
     profile_name: str,
     profile: TrainingProfile,
-    checkpoints_dir: Path,
+    primary_auto_checkpoints_dir: Path,
+    compatibility_auto_checkpoints_dir: Path | None,
     resume_state: ResumeState,
     evaluation_settings: EvaluationSettings,
     run_label: str | None = None,
@@ -204,14 +222,23 @@ def print_training_summary(
         if resume_state.mode == "from_scratch":
             print_block("Resume", ["Entrenamiento forzado desde cero."])
         elif resume_state.mode == AUTO_RESUME_MODE:
-            print_block("Resume", ["No se encontro checkpoint compatible. El entrenamiento comienza desde cero."])
+            print_block(
+                "Resume",
+                ["No se encontro checkpoint compatible. El entrenamiento comienza desde cero."],
+            )
         else:
             print_block("Resume", ["Entrenamiento comenzando desde cero."])
 
     print_kv_block(
         "Artifacts",
         [
-            ("auto_checkpoints", format_path_tail(checkpoints_dir)),
+            ("run_auto_checkpoints", format_path_tail(primary_auto_checkpoints_dir)),
+            (
+                "compat_auto_checkpoints",
+                format_path_tail(compatibility_auto_checkpoints_dir)
+                if compatibility_auto_checkpoints_dir is not None
+                else "disabled",
+            ),
         ],
     )
     if profile.early_stopping.enabled:
@@ -276,25 +303,29 @@ def train_profile(
         from_scratch=from_scratch,
         allow_scenario_change=allow_scenario_resume,
     )
+    run_created_at = datetime.now(UTC)
+    run_id = build_run_id(profile, run_created_at)
+    run_artifacts = build_run_artifact_paths(project_paths, run_id)
     evaluation_settings = EvaluationSettings(
         frequency=resolved_eval_frequency,
         episodes=resolved_eval_episodes,
         save_best=save_best,
-        best_checkpoint_stem=project_paths.checkpoints_dir / f"{profile.checkpoint_name}_best",
+        best_checkpoint_stem=run_artifacts.best_checkpoint_stem,
+        compatibility_best_checkpoint_stem=project_paths.checkpoints_dir
+        / f"{profile.checkpoint_name}_best",
         seed=profile.seed + 1,
     )
 
-    final_checkpoint_stem = project_paths.checkpoints_dir / profile.checkpoint_name
-    run_created_at = datetime.now(UTC)
-    run_id = build_run_id(profile, run_created_at)
-    run_artifacts = build_run_artifact_paths(project_paths, run_id)
+    official_final_checkpoint_stem = project_paths.checkpoints_dir / profile.checkpoint_name
     started_at = perf_counter()
-    final_checkpoint_path = checkpoint_zip_path(final_checkpoint_stem)
+    final_checkpoint_path = checkpoint_zip_path(run_artifacts.final_checkpoint_stem)
+    best_checkpoint_path: Path | None = None
     report_path: Path | None = None
     ensure_directories(
         [
             run_artifacts.run_dir,
             run_artifacts.checkpoints_dir,
+            run_artifacts.auto_checkpoints_dir,
             run_artifacts.tensorboard_dir,
             run_artifacts.videos_dir,
         ]
@@ -306,9 +337,11 @@ def train_profile(
     eval_env.seed(eval_profile.seed)
     model = load_training_model(env, profile, run_artifacts.tensorboard_dir, resume_state)
     callback = PeriodicTrainingCallback(
+        run_id=run_id,
         profile_name=profile_name,
         profile=profile,
-        auto_checkpoint_dir=project_paths.auto_checkpoints_dir,
+        auto_checkpoint_dir=run_artifacts.auto_checkpoints_dir,
+        compatibility_auto_checkpoint_dir=project_paths.auto_checkpoints_dir,
         evaluation_settings=evaluation_settings,
         eval_env=eval_env,
         resume_state=resume_state,
@@ -317,6 +350,7 @@ def train_profile(
     print_training_summary(
         profile_name,
         profile,
+        run_artifacts.auto_checkpoints_dir,
         project_paths.auto_checkpoints_dir,
         resume_state,
         evaluation_settings,
@@ -337,7 +371,10 @@ def train_profile(
         if callback.early_stopping.stopped:
             training_status = "early_stopped"
     except KeyboardInterrupt:
-        print_block("Training Interrupted", ["Entrenamiento interrumpido por usuario.", "Guardando progreso..."])
+        print_block(
+            "Training Interrupted",
+            ["Entrenamiento interrumpido por usuario.", "Guardando progreso..."],
+        )
         training_status = "keyboard_interrupt"
     except ViZDoomUnexpectedExitException:
         print_block("Training Interrupted", ["ViZDoom se cerro.", "Guardando progreso..."])
@@ -348,14 +385,18 @@ def train_profile(
             profile_name=profile_name,
             profile=profile,
             saved_timesteps=model.num_timesteps,
+            run_id=run_id,
             resume_source=resume_state.resume_source,
             resume_saved_timesteps=resume_state.resume_saved_timesteps,
             training_status=training_status,
+            checkpoint_role="final",
+            evaluation_source="training_internal",
+            canonical_checkpoint_path=str(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
             evaluation_metrics=callback.last_evaluation_metrics,
             is_best_checkpoint=False,
         )
-        save_checkpoint_bundle(model, final_checkpoint_stem, metadata)
-        copy_checkpoint_bundle(final_checkpoint_stem, run_artifacts.final_checkpoint_stem)
+        save_checkpoint_bundle(model, run_artifacts.final_checkpoint_stem, metadata)
+        copy_checkpoint_bundle(run_artifacts.final_checkpoint_stem, official_final_checkpoint_stem)
         try:
             env.close()
         except ViZDoomUnexpectedExitException:
@@ -365,10 +406,24 @@ def train_profile(
         except ViZDoomUnexpectedExitException:
             pass
 
-        best_checkpoint_path = copy_run_best_checkpoint_if_updated(
-            final_checkpoint_stem,
+        copy_run_best_checkpoint_if_updated(
             run_artifacts.best_checkpoint_stem,
+            project_paths.checkpoints_dir / f"{profile.checkpoint_name}_best",
             best_checkpoint_updated=callback.best_checkpoint_updated,
+        )
+        run_best_checkpoint_path = checkpoint_zip_path(run_artifacts.best_checkpoint_stem)
+        best_checkpoint_path = (
+            run_best_checkpoint_path
+            if run_best_checkpoint_path.exists()
+            else (
+                checkpoint_zip_path(resume_state.checkpoint.checkpoint_stem)
+                if resume_state.checkpoint is not None
+                else None
+            )
+        )
+        selected_auto_checkpoint_paths = select_auto_checkpoints_for_sync(
+            run_artifacts.auto_checkpoints_dir,
+            profile.checkpoint_name,
         )
         report = build_training_run_report(
             run_id=run_id,
@@ -379,6 +434,15 @@ def train_profile(
             run_artifacts=run_artifacts,
             checkpoint_path=final_checkpoint_path,
             best_checkpoint_path=best_checkpoint_path,
+            selected_auto_checkpoint_paths=selected_auto_checkpoint_paths,
+            official_checkpoint_path=official_final_checkpoint_stem.with_suffix(".zip"),
+            official_best_checkpoint_path=(
+                (project_paths.checkpoints_dir / f"{profile.checkpoint_name}_best").with_suffix(
+                    ".zip"
+                )
+                if run_best_checkpoint_path.exists()
+                else None
+            ),
             training_status=training_status,
             completed=completed,
             saved_timesteps=model.num_timesteps,
@@ -392,15 +456,53 @@ def train_profile(
             stop_reason=callback.early_stopping.stop_reason,
         )
         report_path = save_training_run_report(project_paths, report)
+        manifest = build_run_manifest(
+            report,
+            run_artifacts=run_artifacts,
+            report_path=report_path,
+        )
+        save_run_manifest(run_artifacts, manifest)
         _persist_run_report_to_database(report, report_path)
-        _sync_run_artifacts_to_remote(run_id)
+        from doom_agent.services.workspace_handoff import (
+            publish_local_workspace_state,
+            update_local_workspace_pointer,
+        )
+
+        active_source_checkpoint_path = (
+            best_checkpoint_path if best_checkpoint_path is not None else final_checkpoint_path
+        )
+        update_local_workspace_pointer(
+            active_source_checkpoint_path,
+            pointer_kind="active",
+            root_dir=project_paths.root_dir,
+        )
+        sync_result = _sync_run_artifacts_to_remote(run_id)
+        if sync_result is not None and sync_result.failed_count == 0:
+            try:
+                publish_local_workspace_state(root_dir=project_paths.root_dir)
+            except Exception as error:
+                print_block(
+                    "Workspace Handoff Warning",
+                    [
+                        "No se pudo publicar estado compartido de handoff.",
+                        f"error={type(error).__name__}: {error}",
+                        "Checkpoint active local sigue disponible.",
+                    ],
+                )
 
         print_kv_block(
             "Training Result",
             [
                 ("status", training_status),
                 ("saved_steps", model.num_timesteps),
-                ("model", format_path_tail(final_checkpoint_stem.with_suffix(".zip"))),
+                (
+                    "model",
+                    format_path_tail(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
+                ),
+                (
+                    "official_alias",
+                    format_path_tail(official_final_checkpoint_stem.with_suffix(".zip")),
+                ),
                 ("report", format_path_tail(report_path)),
             ],
         )
@@ -412,6 +514,7 @@ def train_profile(
         profile_name=profile_name,
         profile=profile,
         final_checkpoint_path=final_checkpoint_path,
+        best_checkpoint_path=best_checkpoint_path,
         report_path=report_path,
         training_status=training_status,
         completed=completed,

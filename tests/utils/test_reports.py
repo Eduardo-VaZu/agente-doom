@@ -37,8 +37,12 @@ class ReportTests(unittest.TestCase):
             run_label="manual:test",
             profile=profile,
             run_artifacts=run_artifacts,
-            checkpoint_path=project_paths.checkpoints_dir / f"{profile.checkpoint_name}.zip",
-            best_checkpoint_path=project_paths.checkpoints_dir
+            checkpoint_path=run_artifacts.final_checkpoint_stem.with_suffix(".zip"),
+            best_checkpoint_path=run_artifacts.best_checkpoint_stem.with_suffix(".zip"),
+            selected_auto_checkpoint_paths=[],
+            official_checkpoint_path=project_paths.checkpoints_dir
+            / f"{profile.checkpoint_name}.zip",
+            official_best_checkpoint_path=project_paths.checkpoints_dir
             / f"{profile.checkpoint_name}_best.zip",
             training_status="completed",
             completed=True,
@@ -78,6 +82,7 @@ class ReportTests(unittest.TestCase):
             self.assertTrue(report_path.exists())
             self.assertEqual(report_path, report_path_for_run(project_paths, run_id))
             saved_report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(saved_report["profile"]["checkpoint_name"], profile.checkpoint_name)
             self.assertEqual(saved_report["evaluation_history"][0]["step"], 25000)
             self.assertEqual(
                 saved_report["evaluation_history"][0]["top_actions"][0]["label"],
@@ -91,6 +96,20 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(runs[0]["mean_reward"], 10.0)
             self.assertEqual(runs[0]["run_label"], "manual:test")
             self.assertEqual(runs[0]["seed"], 123)
+            self.assertEqual(
+                saved_report["run_auto_checkpoints_dir"],
+                str(run_artifacts.auto_checkpoints_dir),
+            )
+            self.assertEqual(
+                saved_report["checkpoint_path"],
+                str(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
+            )
+            self.assertEqual(
+                saved_report["official_checkpoint_path"],
+                str(project_paths.checkpoints_dir / f"{profile.checkpoint_name}.zip"),
+            )
+            self.assertEqual(saved_report["manifest_path"], str(run_artifacts.manifest_path))
+            self.assertEqual(saved_report["selected_auto_checkpoint_archive_paths"], [])
             self.assertEqual(
                 runs[0]["checkpoint_archive_path"],
                 str(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
@@ -144,8 +163,12 @@ class ReportTests(unittest.TestCase):
             run_label=None,
             profile=profile,
             run_artifacts=run_artifacts,
-            checkpoint_path=project_paths.checkpoints_dir / f"{profile.checkpoint_name}.zip",
+            checkpoint_path=run_artifacts.final_checkpoint_stem.with_suffix(".zip"),
             best_checkpoint_path=None,
+            selected_auto_checkpoint_paths=[],
+            official_checkpoint_path=project_paths.checkpoints_dir
+            / f"{profile.checkpoint_name}.zip",
+            official_best_checkpoint_path=None,
             training_status="completed",
             completed=True,
             saved_timesteps=profile.effective_timesteps,

@@ -2,8 +2,27 @@
 
 Proyecto de entrenamiento en ViZDoom con `Stable-Baselines3` y `RecurrentPPO`.
 
-Hoy el flujo principal entrena modelo `foundation` sobre escenario `basic`, usando `make` como punto unico de operacion.
-La persistencia remota activa usa `Neon` para metadata y `AWS S3` para artefactos pesados.
+Hoy el repo entrena el modelo `foundation` sobre el escenario `basic`, usando `make`
+como punto principal de operacion. La persistencia remota activa usa `Neon` para metadata
+y `AWS S3` para artefactos pesados.
+
+## Que es este repo
+
+Este proyecto hace cinco cosas principales:
+
+1. define configuraciones de entrenamiento por escenario
+2. entrena y evalua agentes en ViZDoom
+3. guarda corridas, checkpoints y reportes
+4. sincroniza artefactos con `Neon + S3`
+5. permite continuidad operativa entre PCs con `hydrate-workspace`
+
+## Indice rapido
+
+- [Inicio rapido](#inicio-rapido)
+- [Flujo recomendado](#flujo-recomendado)
+- [Comandos principales](#comandos-principales)
+- [Storage remoto](#storage-remoto)
+- [Mapa de documentacion](#mapa-de-documentacion)
 
 ## Requisitos
 
@@ -18,7 +37,7 @@ Si todavia no los tienes instalados:
 
 Python:
 - descarga para Windows: [python.org/downloads/windows](https://www.python.org/downloads/windows/)
-- durante instalacion, marca opcion para agregar Python al `PATH`
+- durante la instalacion, marca la opcion para agregar Python al `PATH`
 
 make:
 - opcion recomendada en Windows con Chocolatey:
@@ -62,78 +81,16 @@ Entrenar desde cero:
 make train-from-scratch
 ```
 
-Ver TensorBoard:
+Abrir TensorBoard:
 
 ```powershell
 make tensorboard
 ```
 
-Evaluar modelo visualmente:
+Evaluar:
 
 ```powershell
 make evaluate
-```
-
-## Storage remoto
-
-Backend remoto principal:
-
-- metadata: `Neon / PostgreSQL`
-- object storage: `AWS S3`
-
-Variables esperadas en `.env`:
-
-```env
-AGENTE_DOOM_DATABASE_URL="postgresql+psycopg://USER:PASSWORD@HOST/neondb?sslmode=require"
-AGENTE_DOOM_STORAGE_BACKEND="s3"
-AGENTE_DOOM_S3_BUCKET="agente-doom-artifacts-prod"
-AGENTE_DOOM_S3_REGION="us-east-1"
-AGENTE_DOOM_S3_ACCESS_KEY_ID="TU_ACCESS_KEY_ID"
-AGENTE_DOOM_S3_SECRET_ACCESS_KEY="TU_SECRET_ACCESS_KEY"
-AGENTE_DOOM_S3_ENDPOINT_URL=""
-AGENTE_DOOM_S3_OBJECT_PREFIX="runs"
-```
-
-## MinIO local opcional
-
-Si quieres probar sync remoto sin montar nada en nube, proyecto ya trae `docker-compose.yml`
-para levantar `MinIO` local.
-
-Levantar MinIO:
-
-```powershell
-make minio-up
-```
-
-Panel web:
-
-- API S3: `http://127.0.0.1:9000`
-- consola: `http://127.0.0.1:9001`
-- usuario: `minio`
-- password: `minioadmin`
-
-Luego agrega estas variables a tu `.env` local:
-
-```env
-AGENTE_DOOM_MINIO_ENDPOINT="http://127.0.0.1:9000"
-AGENTE_DOOM_MINIO_ACCESS_KEY="minio"
-AGENTE_DOOM_MINIO_SECRET_KEY="minioadmin"
-AGENTE_DOOM_MINIO_BUCKET="agente-doom-artifacts"
-AGENTE_DOOM_MINIO_SECURE="false"
-AGENTE_DOOM_MINIO_REGION=""
-AGENTE_DOOM_MINIO_OBJECT_PREFIX="runs"
-```
-
-Parar MinIO:
-
-```powershell
-make minio-down
-```
-
-Ver logs:
-
-```powershell
-make minio-logs
 ```
 
 ## Flujo recomendado
@@ -156,25 +113,20 @@ Luego revisar resultados:
 
 ```powershell
 make list-runs
-make list-checkpoints
-make evaluate
+make inspect-run RUN_ID=doom_foundation_agent__YYYYMMDDTHHMMSSffffffZ
+make evaluate CHECKPOINT=artifacts\checkpoints\doom_foundation_agent_best.zip EPISODES=50 NO_RENDER=1 JSON=1
 ```
 
-Si MinIO esta configurado en `.env`, al final de cada corrida proyecto intentara subir
-artefactos remotos elegibles y registrar resultado en `PostgreSQL`.
-
-Si `AGENTE_DOOM_STORAGE_BACKEND="s3"`, proyecto usara `AWS S3` como backend remoto principal.
-
-Si una corrida queda `local_only` o `failed`, ahora puedes resincronizar artefactos manualmente
-sin reentrenar. Este resync considera `checkpoint` y `video`; `report.json` sigue local.
-
-Ejemplos:
+Si quieres fijar un checkpoint oficial:
 
 ```powershell
-.\.venv\Scripts\python.exe src\cli.py sync-artifacts --run-id doom_foundation_agent__20260617T040513523127Z
-.\.venv\Scripts\python.exe src\cli.py sync-artifacts --all-local-only --limit 20
-.\.venv\Scripts\python.exe src\cli.py sync-artifacts --all-failed --limit 20
-.\.venv\Scripts\python.exe src\cli.py sync-artifacts --run-id doom_foundation_agent__20260617T040513523127Z --dry-run
+make promote CHECKPOINT=artifacts\checkpoints\auto\doom_foundation_agent_1250000_steps.zip PROMOTE_EPISODES=50
+```
+
+Si quieres continuar en otra PC:
+
+```powershell
+make hydrate ONLY=promoted
 ```
 
 ## Comandos principales
@@ -182,18 +134,8 @@ Ejemplos:
 Preparacion:
 
 ```powershell
-make venv
-make install
 make setup
 make bootstrap
-```
-
-Validacion:
-
-```powershell
-make lint
-make typecheck
-make test
 make check
 ```
 
@@ -210,49 +152,68 @@ Evaluacion e inspeccion:
 ```powershell
 make evaluate
 make evaluate-last
-make play
 make inspect
+make inspect-run RUN_ID=doom_foundation_agent__YYYYMMDDTHHMMSSffffffZ
+make promote CHECKPOINT=artifacts\checkpoints\auto\doom_foundation_agent_1250000_steps.zip
 ```
 
-Seguimiento:
+Sync y handoff:
 
 ```powershell
-make list-runs
-make list-checkpoints
-make sync-artifacts RUN_ID=doom_foundation_agent__20260617T040513523127Z
+make sync-artifacts RUN_ID=doom_foundation_agent__YYYYMMDDTHHMMSSffffffZ
 make sync-local-only LIMIT=20
 make sync-failed LIMIT=20
-make sync-dry-run RUN_ID=doom_foundation_agent__20260617T040513523127Z
+make sync-dry-run RUN_ID=doom_foundation_agent__YYYYMMDDTHHMMSSffffffZ
+make hydrate ONLY=promoted
+```
+
+Observabilidad:
+
+```powershell
 make tensorboard
+make list-runs
+make list-checkpoints
 ```
 
-## Variables utiles
+Variables utiles:
 
-Escenario:
+- `SEED=42`
+- `TIMESTEPS=1500000`
+- `CHECKPOINT=...`
+- `RUN_ID=...`
+- `EPISODES=50`
+- `NO_RENDER=1`
+- `JSON=1`
+- `ONLY=active|promoted|both`
 
-```powershell
-make train SCENARIO=basic
-make evaluate SCENARIO=basic
+Para ver la guia operativa completa de comandos, abre
+[docs/comandos_principales.md](/E:/agente-doom/docs/comandos_principales.md:1).
+
+## Storage remoto
+
+Backend remoto principal:
+
+- metadata: `Neon / PostgreSQL`
+- object storage: `AWS S3`
+
+Variables esperadas en `.env`:
+
+```env
+AGENTE_DOOM_DATABASE_URL="postgresql+psycopg://USER:PASSWORD@HOST/neondb?sslmode=require"
+AGENTE_DOOM_STORAGE_BACKEND="s3"
+AGENTE_DOOM_S3_BUCKET="agente-doom-artifacts-prod"
+AGENTE_DOOM_S3_REGION="us-east-1"
+AGENTE_DOOM_S3_ACCESS_KEY_ID="TU_ACCESS_KEY_ID"
+AGENTE_DOOM_S3_SECRET_ACCESS_KEY="TU_SECRET_ACCESS_KEY"
+AGENTE_DOOM_S3_ENDPOINT_URL=""
+AGENTE_DOOM_S3_OBJECT_PREFIX="runs"
 ```
 
-Timesteps y seed:
+Con configuracion `S3` valida en `.env`, al final de cada corrida el proyecto intenta subir
+artefactos elegibles y registrar metadata en `PostgreSQL`.
 
-```powershell
-make train TIMESTEPS=750000 SEED=42
-```
-
-Evaluacion limitada:
-
-```powershell
-make evaluate STEPS=2000
-```
-
-Checkpoint explicito:
-
-```powershell
-make evaluate CHECKPOINT=artifacts\checkpoints\doom_foundation_agent.zip
-make inspect CHECKPOINT=artifacts\checkpoints\doom_foundation_agent.zip
-```
+Si una corrida queda `local_only` o `failed`, puedes resincronizar sin reentrenar. Ese flujo
+considera `report.json`, `manifest.json`, checkpoints y videos elegibles.
 
 ## Que guarda el proyecto
 
@@ -267,11 +228,66 @@ make inspect CHECKPOINT=artifacts\checkpoints\doom_foundation_agent.zip
 - escenario activo: `basic`
 - fase entrenamiento: `Fase 1`
 - fase storage: `Fase 2`
-- flujo principal: `train --scenario <scenario>`
-- comandos retirados del flujo publico:
-  - `sweep`
-  - `list-scenarios`
-  - `list-profiles`
+- flujo principal: `make train`
+
+## Mapa de documentacion
+
+Este mapa usa la misma estructura consolidada de la carpeta `docs`.
+
+### Referencia
+
+- [vizdoom_escenarios_oficiales.md](/E:/agente-doom/docs/vizdoom_escenarios_oficiales.md:1)
+  Universo de escenarios oficiales de ViZDoom. Responde: que existe.
+
+- [how_to_add_scenario.md](/E:/agente-doom/docs/how_to_add_scenario.md:1)
+  Procedimiento tecnico para agregar un escenario al proyecto.
+
+### Nucleo operativo
+
+- [estado_actual.md](/E:/agente-doom/docs/estado_actual.md:1)
+  Fuente de verdad del estado vivo del repo y de lo ya implementado.
+
+- [storage_y_handoff.md](/E:/agente-doom/docs/storage_y_handoff.md:1)
+  Storage remoto, sync, promotion, hydrate y continuidad entre PCs.
+
+- [plan_escenarios.md](/E:/agente-doom/docs/plan_escenarios.md:1)
+  Roadmap y estado operativo de escenarios por fase.
+
+### Seguimiento y apoyo
+
+- [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
+  Bitacora cronologica de cambios y resultados. Responde: que ya se probo y que paso.
+
+- [comandos_principales.md](/E:/agente-doom/docs/comandos_principales.md:1)
+  Guia practica de `make` y comandos reales del dia a dia. Responde: que comando usar, cuando y con que variables.
+
+- [glosario.md](/E:/agente-doom/docs/glosario.md:1)
+  Vocabulario operativo del proyecto. Responde: como nombramos cada concepto en espanol sin pelear con el codigo.
+
+- [estructura_repo.md](/E:/agente-doom/docs/estructura_repo.md:1)
+  Mapa del repo por carpetas, modulos y archivos clave. Responde: donde vive cada responsabilidad y que hace cada pieza.
+
+### Como usarlos juntos
+
+1. Abre [estado_actual.md](/E:/agente-doom/docs/estado_actual.md:1)
+   Para saber en que estamos y que ya existe.
+
+2. Si necesitas revisar storage, sync o multi-PC, abre [storage_y_handoff.md](/E:/agente-doom/docs/storage_y_handoff.md:1)
+   Para entender continuidad operativa real.
+
+3. Si necesitas ver escenarios y prioridad, abre [plan_escenarios.md](/E:/agente-doom/docs/plan_escenarios.md:1)
+
+4. Si necesitas contexto historico real, abre [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
+
+5. Si necesitas guia operativa de comandos, abre [comandos_principales.md](/E:/agente-doom/docs/comandos_principales.md:1)
+
+6. Si necesitas vocabulario consistente del proyecto, abre [glosario.md](/E:/agente-doom/docs/glosario.md:1)
+
+7. Si necesitas mapa de modulos y archivos, abre [estructura_repo.md](/E:/agente-doom/docs/estructura_repo.md:1)
+
+8. Si necesitas agregar un escenario nuevo, abre [how_to_add_scenario.md](/E:/agente-doom/docs/how_to_add_scenario.md:1)
+
+9. Si necesitas revisar universo oficial de ViZDoom, abre [vizdoom_escenarios_oficiales.md](/E:/agente-doom/docs/vizdoom_escenarios_oficiales.md:1)
 
 ## Ayuda
 
@@ -281,4 +297,8 @@ Ver ayuda general del Makefile:
 make help
 ```
 
-Si necesitas mas contexto funcional o roadmap, revisa carpeta `docs/`.
+Si quieres empezar entendiendo el repo sin perderte, abre en este orden:
+
+1. [docs/estado_actual.md](/E:/agente-doom/docs/estado_actual.md:1)
+2. [docs/comandos_principales.md](/E:/agente-doom/docs/comandos_principales.md:1)
+3. [docs/estructura_repo.md](/E:/agente-doom/docs/estructura_repo.md:1)

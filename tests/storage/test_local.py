@@ -13,12 +13,19 @@ from doom_agent.storage import build_run_artifact_paths
 class LocalStorageTests(unittest.TestCase):
     def test_run_artifact_paths_are_namespaced_by_run_id(self) -> None:
         project_paths = build_project_paths(root_dir=Path("artifacts") / "test-temp" / "storage")
-        run_artifacts = build_run_artifact_paths(project_paths, "foundation__20260101T000000000000Z")
+        run_artifacts = build_run_artifact_paths(
+            project_paths, "foundation__20260101T000000000000Z"
+        )
 
         self.assertEqual(
             run_artifacts.run_dir,
             project_paths.runs_dir / "foundation__20260101T000000000000Z",
         )
         self.assertEqual(run_artifacts.report_path, run_artifacts.run_dir / "report.json")
+        self.assertEqual(run_artifacts.manifest_path, run_artifacts.run_dir / "manifest.json")
         self.assertEqual(run_artifacts.videos_dir, run_artifacts.run_dir / "videos")
         self.assertEqual(run_artifacts.tensorboard_dir, run_artifacts.run_dir / "tensorboard")
+        self.assertEqual(
+            run_artifacts.auto_checkpoints_dir,
+            run_artifacts.run_dir / "checkpoints" / "auto",
+        )

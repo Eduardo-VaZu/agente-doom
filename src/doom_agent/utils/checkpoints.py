@@ -37,19 +37,36 @@ def best_checkpoint_stem(checkpoint_stem: Path) -> Path:
     return checkpoint_stem.with_name(f"{checkpoint_stem.name}_best")
 
 
+def active_checkpoint_stem(checkpoint_stem: Path) -> Path:
+    if checkpoint_stem.name.endswith("_active"):
+        return checkpoint_stem
+    return checkpoint_stem.with_name(f"{checkpoint_stem.name}_active")
+
+
+def promoted_checkpoint_stem(checkpoint_stem: Path) -> Path:
+    if checkpoint_stem.name.endswith("_promoted"):
+        return checkpoint_stem
+    return checkpoint_stem.with_name(f"{checkpoint_stem.name}_promoted")
+
+
 def build_checkpoint_metadata(
     profile_name: str,
     profile: TrainingProfile,
     saved_timesteps: int | None = None,
     *,
+    run_id: str | None = None,
     resume_source: str | None = None,
     resume_saved_timesteps: int | None = None,
     training_status: str | None = None,
+    checkpoint_role: str | None = None,
+    evaluation_source: str | None = None,
+    canonical_checkpoint_path: str | None = None,
     evaluation_metrics: EvaluationMetricsPayload | None = None,
     is_best_checkpoint: bool = False,
 ) -> CheckpointMetadataPayload:
     payload: CheckpointMetadataPayload = {
         "profile_name": profile_name,
+        "run_id": run_id,
         "saved_timesteps": saved_timesteps
         if saved_timesteps is not None
         else profile.effective_timesteps,
@@ -58,6 +75,9 @@ def build_checkpoint_metadata(
         "resume_source": resume_source,
         "resume_saved_timesteps": resume_saved_timesteps,
         "training_status": training_status,
+        "checkpoint_role": checkpoint_role,
+        "evaluation_source": evaluation_source,
+        "canonical_checkpoint_path": canonical_checkpoint_path,
         "evaluation_metrics": evaluation_metrics,
         "is_best_checkpoint": is_best_checkpoint,
     }
@@ -88,6 +108,23 @@ def copy_checkpoint_bundle(source_stem: Path, target_stem: Path) -> None:
     source_metadata_path = checkpoint_metadata_path(source_stem)
     if source_metadata_path.exists():
         shutil.copy2(source_metadata_path, checkpoint_metadata_path(target_stem))
+
+
+def update_checkpoint_metadata(
+    checkpoint_stem: Path,
+    **overrides: object,
+) -> CheckpointMetadataPayload | None:
+    metadata = load_checkpoint_metadata(checkpoint_stem)
+    if metadata is None:
+        return None
+
+    updated_metadata = dict(metadata)
+    updated_metadata.update(overrides)
+    write_json(
+        checkpoint_metadata_path(checkpoint_stem),
+        cast(CheckpointMetadataPayload, updated_metadata),
+    )
+    return cast(CheckpointMetadataPayload, updated_metadata)
 
 
 def load_checkpoint_metadata(checkpoint_stem: Path) -> CheckpointMetadataPayload | None:
@@ -186,6 +223,13 @@ def select_latest_checkpoint(candidates: list[ResolvedCheckpoint]) -> ResolvedCh
 def resolve_latest_checkpoint(
     project_paths: ProjectPaths, checkpoint_prefix: str
 ) -> ResolvedCheckpoint | None:
+    try:
+        return resolve_checkpoint(
+            project_paths, promoted_checkpoint_stem(Path(checkpoint_prefix)).name
+        )
+    except FileNotFoundError:
+        pass
+
     candidates = [
         *list_matching_checkpoints(project_paths.checkpoints_dir, checkpoint_prefix),
         *list_matching_checkpoints(project_paths.auto_checkpoints_dir, checkpoint_prefix),
@@ -193,6 +237,24 @@ def resolve_latest_checkpoint(
         *list_matching_checkpoints(project_paths.legacy_auto_checkpoints_dir, checkpoint_prefix),
     ]
     return select_latest_checkpoint(candidates)
+
+
+def resolve_resume_checkpoint(
+    project_paths: ProjectPaths, checkpoint_prefix: str
+) -> ResolvedCheckpoint | None:
+    try:
+        return resolve_checkpoint(project_paths, active_checkpoint_stem(Path(checkpoint_prefix)).name)
+    except FileNotFoundError:
+        pass
+
+    try:
+        return resolve_checkpoint(
+            project_paths, promoted_checkpoint_stem(Path(checkpoint_prefix)).name
+        )
+    except FileNotFoundError:
+        pass
+
+    return resolve_latest_checkpoint(project_paths, checkpoint_prefix)
 
 
 def list_all_checkpoints(project_paths: ProjectPaths) -> list[ResolvedCheckpoint]:
@@ -235,11 +297,19 @@ def resolve_checkpoint_preference(
             return latest_checkpoint
         return resolve_checkpoint(project_paths, checkpoint_name)
 
+    preferred_promoted = promoted_checkpoint_stem(candidate)
     preferred_best = best_checkpoint_stem(candidate)
     if candidate.parent != Path("."):
+        if checkpoint_zip_path(preferred_promoted).exists():
+            return _resolved_checkpoint_from_stem(preferred_promoted)
         if checkpoint_zip_path(preferred_best).exists():
             return _resolved_checkpoint_from_stem(preferred_best)
         return resolve_checkpoint(project_paths, checkpoint_name)
+
+    try:
+        return resolve_checkpoint(project_paths, preferred_promoted.name)
+    except FileNotFoundError:
+        pass
 
     try:
         return resolve_checkpoint(project_paths, preferred_best.name)

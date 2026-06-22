@@ -1,3 +1,4 @@
+# Base compartida para cualquier perfil o escenario del proyecto.
 [defaults]
 scenario_key = "basic"
 render = false
@@ -10,19 +11,18 @@ screen_height = 84
 seed = 42
 action_space_kind = "button_combinations"
 
+# Reward shaping base compartido; cada escenario puede overridearlo si hace falta.
 [defaults.reward_shaping]
 scale = 1.0
 offset = 0.0
 
+# Politica global de early stopping; hoy queda desactivada por defecto.
 [defaults.early_stopping]
 enabled = false
 patience_evaluations = 3
 min_evaluations = 2
 min_delta = 0.0
 
+# Perfil publico principal del repo. Parte de la base compartida y apunta al escenario activo.
 [profiles.default]
 scenario_key = "basic"
-
-[profiles.basic_v2]
-scenario_key = "basic"
-ent_coef = 0.015

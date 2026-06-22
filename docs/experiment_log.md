@@ -108,3 +108,31 @@ Cada entrada debe incluir:
 - decision siguiente:
   - correr nueva corrida limpia para repoblar metadata y artefactos reales
   - validar pipeline completo de entrenamiento, persistencia y sync remoto
+
+### 2026-06-20
+
+- escenario: `basic`
+- fase entrenamiento: `Fase 1`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se corrio una baseline larga limpia de `basic`
+  - se reevaluaron checkpoints automaticos con protocolo offline consistente
+  - se agrego `promote-checkpoint` para fijar checkpoint oficial validado
+  - se agrego `hydrate-workspace` para continuidad operativa entre PCs
+  - se agrego `inspect-run` para consolidar `report.json` + `manifest.json`
+  - se paso a usar `report.json` y `manifest.json` dentro del flujo de sync/handoff
+  - se elimino `MinIO` del camino operativo principal; backend remoto unico `AWS S3`
+- comando ejecutado:
+  - `make train-from-scratch SEED=42 TIMESTEPS=1500000`
+  - `make evaluate CHECKPOINT=artifacts\\checkpoints\\auto\\doom_foundation_agent_1250000_steps.zip EPISODES=50 NO_RENDER=1 JSON=1`
+  - `make evaluate CHECKPOINT=artifacts\\runs\\doom_foundation_agent__20260620T172048583643Z\\checkpoints\\final_model.zip EPISODES=50 NO_RENDER=1 JSON=1`
+  - `make promote CHECKPOINT=artifacts\\checkpoints\\auto\\doom_foundation_agent_1250000_steps.zip PROMOTE_EPISODES=50`
+- resultado observado:
+  - checkpoint auto de `1250000` pasos quedo mejor que `final_model` bajo evaluacion offline de `50` episodios
+  - `promoted` quedo apuntando al checkpoint oficialmente preservado
+  - `workspace_state.json` y `hydrate-workspace` dejan listo el flujo base entre PCs
+  - el repo ya no depende solo del disco local para reconstruir continuidad minima
+- decision siguiente:
+  - alinear documentacion con el flujo real de `promoted`, `manifest` y `hydrate`
+  - definir politica simple de retencion/limpieza de artefactos
+  - decidir si `basic` se congela como baseline oficial o si abre iteracion `v2`

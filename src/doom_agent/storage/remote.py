@@ -24,6 +24,13 @@ class ArtifactStore(Protocol):
         content_type: str | None = None,
     ) -> RemoteArtifactLocation: ...
 
+    def download_file(
+        self,
+        *,
+        object_key: str,
+        local_path: Path,
+    ) -> None: ...
+
 
 def guess_content_type(local_path: Path) -> str | None:
     guessed_type, _ = guess_type(local_path.name)
@@ -44,10 +51,6 @@ def build_remote_object_key(
         return str(root_path / PurePosixPath(relative_path.as_posix()))
     except ValueError:
         return str(root_path / artifact_type / local_path.name)
-
-
-def build_remote_uri(bucket_name: str, object_key: str) -> str:
-    return f"minio://{bucket_name}/{object_key}"
 
 
 def _prefix_root(object_prefix: str) -> PurePosixPath:

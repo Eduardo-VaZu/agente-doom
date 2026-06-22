@@ -13,7 +13,7 @@ from doom_agent.storage.remote import RemoteArtifactLocation
 
 
 class FakeArtifactStore:
-    def __init__(self, *, fail: bool = False, storage_backend: str = "minio") -> None:
+    def __init__(self, *, fail: bool = False, storage_backend: str = "s3") -> None:
         self.fail = fail
         self.object_prefix = "runs"
         self.storage_backend = storage_backend
@@ -36,6 +36,16 @@ class FakeArtifactStore:
             remote_uri=f"{self.storage_backend}://agente-doom-artifacts/{object_key}",
             etag="etag-1",
         )
+
+    def download_file(
+        self,
+        *,
+        object_key: str,
+        local_path: Path,
+    ) -> None:
+        _ = object_key
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_text("downloaded", encoding="utf-8")
 
 
 class FakeSyncRepository:
@@ -169,6 +179,42 @@ class ArtifactSyncServiceTests(unittest.TestCase):
                 "runs/run-1/report.json",
             )
             self.assertEqual(repository.updated_run_statuses[-1], ("run-1", "synced"))
+        finally:
+            shutil.rmtree(root_dir, ignore_errors=True)
+
+    def test_sync_run_uploads_manifest_with_distinct_object_key(self) -> None:
+        root_dir = Path("artifacts") / "test-temp" / "sync-service-manifest"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        run_dir = root_dir / "run"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = run_dir / "manifest.json"
+        manifest_path.write_text("{}", encoding="utf-8")
+
+        candidates = [
+            SyncCandidateArtifact(
+                artifact_id=11,
+                run_id="run-1",
+                artifact_type="report",
+                artifact_role=None,
+                local_path=manifest_path,
+                run_local_dir=run_dir,
+            )
+        ]
+        repository = FakeSyncRepository(candidates)
+        artifact_store = FakeArtifactStore()
+
+        try:
+            result = ArtifactSyncService(
+                repository=repository,
+                artifact_store=artifact_store,
+                object_prefix="runs",
+            ).sync_run("run-1")
+
+            self.assertEqual(result.synced_count, 1)
+            self.assertEqual(
+                artifact_store.upload_calls[0][1],
+                "runs/run-1/manifest.json",
+            )
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)
 

@@ -33,6 +33,9 @@ def build_training_run_report(
     run_artifacts: RunArtifactPaths,
     checkpoint_path: Path,
     best_checkpoint_path: Path | None,
+    selected_auto_checkpoint_paths: list[Path] | None,
+    official_checkpoint_path: Path | None,
+    official_best_checkpoint_path: Path | None,
     training_status: str,
     completed: bool,
     saved_timesteps: int,
@@ -45,11 +48,16 @@ def build_training_run_report(
     stop_reason: str | None,
     evaluation_history: list[EvaluationHistoryEntryPayload] | None = None,
 ) -> TrainingRunReportPayload:
+    run_best_checkpoint_path = run_artifacts.best_checkpoint_stem.with_suffix(".zip")
+    best_checkpoint_archive_path = (
+        str(run_best_checkpoint_path) if best_checkpoint_path == run_best_checkpoint_path else None
+    )
     return {
         "run_id": run_id,
         "created_at_utc": created_at_utc,
         "profile_name": profile_name,
         "run_label": run_label,
+        "profile": profile.to_dict(),
         "scenario_key": profile.scenario_key,
         "scenario_name": profile.scenario_name,
         "checkpoint_name": profile.checkpoint_name,
@@ -57,11 +65,23 @@ def build_training_run_report(
         "best_checkpoint_path": str(best_checkpoint_path)
         if best_checkpoint_path is not None
         else None,
-        "checkpoint_archive_path": str(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
-        "best_checkpoint_archive_path": str(run_artifacts.best_checkpoint_stem.with_suffix(".zip"))
-        if best_checkpoint_path is not None
+        "official_checkpoint_path": str(official_checkpoint_path)
+        if official_checkpoint_path is not None
         else None,
+        "official_best_checkpoint_path": str(official_best_checkpoint_path)
+        if official_best_checkpoint_path is not None
+        else None,
+        "manifest_path": str(run_artifacts.manifest_path),
+        "checkpoint_archive_path": str(run_artifacts.final_checkpoint_stem.with_suffix(".zip")),
+        "best_checkpoint_archive_path": best_checkpoint_archive_path,
+        "selected_auto_checkpoint_archive_paths": [
+            str(checkpoint_path)
+            for checkpoint_path in (
+                [] if selected_auto_checkpoint_paths is None else selected_auto_checkpoint_paths
+            )
+        ],
         "run_dir": str(run_artifacts.run_dir),
+        "run_auto_checkpoints_dir": str(run_artifacts.auto_checkpoints_dir),
         "tensorboard_dir": str(run_artifacts.tensorboard_dir),
         "videos_dir": str(run_artifacts.videos_dir),
         "training_status": training_status,
@@ -83,6 +103,14 @@ def build_training_run_report(
 
 def report_path_for_run(project_paths: ProjectPaths, run_id: str) -> Path:
     return project_paths.runs_dir / run_id / "report.json"
+
+
+def load_training_run_report_from_path(report_path: Path) -> TrainingRunReportPayload:
+    raw_report = read_json(report_path)
+    raw_report.setdefault("manifest_path", str(report_path.parent / "manifest.json"))
+    raw_report.setdefault("selected_auto_checkpoint_archive_paths", [])
+    raw_report.setdefault("evaluation_history", [])
+    return cast(TrainingRunReportPayload, raw_report)
 
 
 def build_experiment_index_entry(

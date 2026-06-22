@@ -25,19 +25,12 @@ from doom_agent.persistence.config import (
 )
 from doom_agent.storage.config import (
     DEFAULT_STORAGE_BACKEND,
-    MINIO_ACCESS_KEY_ENV_VAR,
-    MINIO_BUCKET_ENV_VAR,
-    MINIO_ENDPOINT_ENV_VAR,
-    MINIO_SECRET_KEY_ENV_VAR,
-    MINIO_SECURE_ENV_VAR,
     S3_ACCESS_KEY_ID_ENV_VAR,
     S3_BUCKET_ENV_VAR,
     S3_REGION_ENV_VAR,
     S3_SECRET_ACCESS_KEY_ENV_VAR,
-    get_minio_settings,
     get_s3_settings,
     get_storage_backend,
-    has_explicit_minio_config,
     has_explicit_s3_config,
 )
 
@@ -46,7 +39,7 @@ class TrainingProfileTests(unittest.TestCase):
     def test_training_catalog_is_loaded_from_split_toml(self) -> None:
         catalog = load_training_catalog()
         self.assertIn("default", catalog.profiles)
-        self.assertIn("basic_v2", catalog.profiles)
+        self.assertEqual(tuple(catalog.profiles), ("default",))
         self.assertEqual(tuple(catalog.scenarios), ("basic",))
 
     def test_project_paths_include_local_runs_directory(self) -> None:
@@ -56,7 +49,7 @@ class TrainingProfileTests(unittest.TestCase):
     def test_default_is_only_public_profile(self) -> None:
         self.assertEqual(PUBLIC_PROFILE_NAMES, ("default",))
         self.assertEqual(set(PUBLIC_PROFILE_NAMES) | set(ADVANCED_PROFILE_NAMES), set(PROFILE_NAMES))
-        self.assertEqual(ADVANCED_PROFILE_NAMES, ("basic_v2",))
+        self.assertEqual(ADVANCED_PROFILE_NAMES, ())
 
     def test_requested_timesteps_are_rounded_explicitly(self) -> None:
         profile = get_training_profile("default", requested_timesteps=8)
@@ -100,17 +93,6 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual(profile.eval_episodes, 20)
         self.assertEqual(profile.video_record_frequency, 200000)
         self.assertEqual(profile.video_length, 1000)
-
-    def test_basic_v2_only_adjusts_entropy_for_next_iteration(self) -> None:
-        default_profile = get_training_profile("default")
-        v2_profile = get_training_profile("basic_v2")
-        self.assertEqual(default_profile.ent_coef, 0.01)
-        self.assertEqual(v2_profile.ent_coef, 0.015)
-        self.assertEqual(v2_profile.learning_rate, default_profile.learning_rate)
-        self.assertEqual(v2_profile.n_steps, default_profile.n_steps)
-        self.assertEqual(v2_profile.batch_size, default_profile.batch_size)
-        self.assertEqual(v2_profile.n_epochs, default_profile.n_epochs)
-        self.assertEqual(v2_profile.action_combo_preset, default_profile.action_combo_preset)
 
     def test_profile_roundtrip_preserves_evaluation_defaults(self) -> None:
         profile = get_training_profile("default")
@@ -162,71 +144,20 @@ class TrainingProfileTests(unittest.TestCase):
                     "postgresql+psycopg://env:user@host/db?sslmode=require",
                 )
 
-    def test_minio_settings_can_be_loaded_from_env_file(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            env_path = Path(temp_dir) / ".env"
-            env_path.write_text(
-                "\n".join(
-                    [
-                        'AGENTE_DOOM_MINIO_ENDPOINT="http://127.0.0.1:9000"',
-                        'AGENTE_DOOM_MINIO_ACCESS_KEY="minio"',
-                        'AGENTE_DOOM_MINIO_SECRET_KEY="minioadmin"',
-                        'AGENTE_DOOM_MINIO_BUCKET="agente-doom-artifacts"',
-                        'AGENTE_DOOM_MINIO_SECURE="false"',
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            with patch.dict("os.environ", {}, clear=True):
-                load_env_file(env_path)
-                self.assertTrue(has_explicit_minio_config())
-                settings = get_minio_settings()
-                self.assertEqual(settings.endpoint, "127.0.0.1:9000")
-                self.assertFalse(settings.secure)
-                self.assertEqual(settings.bucket_name, "agente-doom-artifacts")
-
-    def test_minio_settings_prefer_real_environment_over_env_file(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            env_path = Path(temp_dir) / ".env"
-            env_path.write_text(
-                "\n".join(
-                    [
-                        'AGENTE_DOOM_MINIO_ENDPOINT="http://127.0.0.1:9000"',
-                        'AGENTE_DOOM_MINIO_ACCESS_KEY="file-user"',
-                        'AGENTE_DOOM_MINIO_SECRET_KEY="file-pass"',
-                        'AGENTE_DOOM_MINIO_BUCKET="file-bucket"',
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            with patch.dict(
-                "os.environ",
-                {
-                    MINIO_ENDPOINT_ENV_VAR: "https://minio.example.com",
-                    MINIO_ACCESS_KEY_ENV_VAR: "env-user",
-                    MINIO_SECRET_KEY_ENV_VAR: "env-pass",
-                    MINIO_BUCKET_ENV_VAR: "env-bucket",
-                    MINIO_SECURE_ENV_VAR: "true",
-                },
-                clear=True,
-            ):
-                load_env_file(env_path)
-                settings = get_minio_settings()
-                self.assertEqual(settings.endpoint, "minio.example.com")
-                self.assertTrue(settings.secure)
-                self.assertEqual(settings.access_key, "env-user")
-                self.assertEqual(settings.bucket_name, "env-bucket")
-
-    def test_storage_backend_defaults_to_minio(self) -> None:
+    def test_storage_backend_defaults_to_s3(self) -> None:
         with (
             patch.dict("os.environ", {}, clear=True),
             patch("doom_agent.storage.config.load_env_file", return_value=None),
         ):
             self.assertEqual(get_storage_backend(), DEFAULT_STORAGE_BACKEND)
+
+    def test_storage_backend_rejects_non_s3_values(self) -> None:
+        with (
+            patch.dict("os.environ", {"AGENTE_DOOM_STORAGE_BACKEND": "minio"}, clear=True),
+            patch("doom_agent.storage.config.load_env_file", return_value=None),
+        ):
+            with self.assertRaises(RuntimeError):
+                get_storage_backend()
 
     def test_s3_settings_can_be_loaded_from_env_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

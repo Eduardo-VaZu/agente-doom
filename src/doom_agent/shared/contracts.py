@@ -87,14 +87,106 @@ class EvaluationSummaryPayload(TypedDict):
     metrics: EvaluationMetricsPayload
 
 
+class WorkspaceCheckpointPointerPayload(TypedDict):
+    profile_name: str
+    scenario_key: str
+    run_id: str
+    source_checkpoint_role: str | None
+    source_relative_run_path: str | None
+    report_relative_run_path: str
+    saved_timesteps: int
+    evaluation_metrics: EvaluationMetricsPayload | None
+    updated_at_utc: str
+
+
+class WorkspaceCheckpointLinePayload(TypedDict, total=False):
+    active: WorkspaceCheckpointPointerPayload
+    promoted: WorkspaceCheckpointPointerPayload
+
+
+class WorkspaceStatePayload(TypedDict):
+    updated_at_utc: str
+    checkpoint_lines: dict[str, WorkspaceCheckpointLinePayload]
+
+
+class RunManifestArtifactPayload(TypedDict, total=False):
+    relative_path: str
+    artifact_type: str
+    artifact_role: str | None
+    sidecar_kind: str | None
+    remote_sync_candidate: bool
+    exists: bool
+    file_size_bytes: int | None
+
+
+class RunManifestPayload(TypedDict):
+    manifest_version: int
+    run_id: str
+    created_at_utc: str
+    profile_name: str
+    run_label: str | None
+    profile: TrainingProfilePayload
+    scenario_key: str
+    scenario_name: str
+    checkpoint_name: str
+    seed: int
+    requested_timesteps: int
+    effective_timesteps: int
+    saved_timesteps: int
+    training_status: str
+    completed: bool
+    evaluation_metrics: EvaluationMetricsPayload | None
+    artifacts: list[RunManifestArtifactPayload]
+
+
+class RunInspectionPayload(TypedDict):
+    run_id: str
+    created_at_utc: str
+    profile_name: str
+    run_label: str | None
+    scenario_key: str
+    scenario_name: str
+    checkpoint_name: str
+    seed: int
+    requested_timesteps: int
+    effective_timesteps: int
+    saved_timesteps: int
+    training_status: str
+    completed: bool
+    sync_status: str | None
+    mean_reward: float | None
+    std_reward: float | None
+    mean_episode_length: float | None
+    evaluation_episodes: int | None
+    evaluation_history_count: int
+    latest_evaluation_step: int | None
+    report_path: str
+    report_exists: bool
+    manifest_path: str
+    manifest_exists: bool
+    checkpoint_archive_path: str
+    checkpoint_archive_exists: bool
+    best_checkpoint_archive_path: str | None
+    best_checkpoint_archive_exists: bool
+    selected_auto_checkpoint_archive_paths: list[str]
+    selected_auto_checkpoint_count: int
+    remote_sync_candidates: list[str]
+    remote_sync_candidate_count: int
+    handoff_ready: bool
+
+
 class CheckpointMetadataPayload(TypedDict):
     profile_name: str
+    run_id: str | None
     saved_timesteps: int
     saved_at_utc: str
     profile: TrainingProfilePayload
     resume_source: str | None
     resume_saved_timesteps: int | None
     training_status: str | None
+    checkpoint_role: str | None
+    evaluation_source: str | None
+    canonical_checkpoint_path: str | None
     evaluation_metrics: EvaluationMetricsPayload | None
     is_best_checkpoint: bool
 
@@ -104,14 +196,20 @@ class TrainingRunReportPayload(TypedDict):
     created_at_utc: str
     profile_name: str
     run_label: str | None
+    profile: TrainingProfilePayload
     scenario_key: str
     scenario_name: str
     checkpoint_name: str
     checkpoint_path: str
     best_checkpoint_path: str | None
+    official_checkpoint_path: str | None
+    official_best_checkpoint_path: str | None
+    manifest_path: str
     checkpoint_archive_path: str
     best_checkpoint_archive_path: str | None
+    selected_auto_checkpoint_archive_paths: list[str]
     run_dir: str
+    run_auto_checkpoints_dir: str
     tensorboard_dir: str
     videos_dir: str
     training_status: str

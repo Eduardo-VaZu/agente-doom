@@ -8,7 +8,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from doom_agent.cli.evaluate import add_evaluate_arguments
+from doom_agent.cli.hydrate import add_hydrate_arguments
 from doom_agent.cli.main import _build_parser
+from doom_agent.cli.promote import add_promote_arguments
+from doom_agent.cli.runs import add_inspect_run_arguments
 from doom_agent.cli.sync import add_sync_arguments
 from doom_agent.cli.train import add_train_arguments
 
@@ -31,7 +34,9 @@ class CliTests(unittest.TestCase):
 
     def test_evaluate_parser_accepts_offline_summary_options(self) -> None:
         parser = add_evaluate_arguments(io_arg_parser("evaluate"))
-        args = parser.parse_args(["--scenario", "basic", "--episodes", "20", "--no-render", "--json"])
+        args = parser.parse_args(
+            ["--scenario", "basic", "--episodes", "20", "--no-render", "--json"]
+        )
         self.assertEqual(args.episodes, 20)
         self.assertTrue(args.no_render)
         self.assertTrue(args.json_output)
@@ -54,6 +59,18 @@ class CliTests(unittest.TestCase):
         self.assertEqual(
             parser.parse_args(["sync-artifacts", "--run-id", "run-123"]).command,
             "sync-artifacts",
+        )
+        self.assertEqual(
+            parser.parse_args(["promote-checkpoint", "--scenario", "basic"]).command,
+            "promote-checkpoint",
+        )
+        self.assertEqual(
+            parser.parse_args(["hydrate-workspace", "--scenario", "basic"]).command,
+            "hydrate-workspace",
+        )
+        self.assertEqual(
+            parser.parse_args(["inspect-run", "--run-id", "run-123"]).command,
+            "inspect-run",
         )
 
     def test_removed_commands_stay_removed_from_public_parser(self) -> None:
@@ -80,6 +97,25 @@ class CliTests(unittest.TestCase):
             parser.parse_args([])
         with self.assertRaises(SystemExit):
             parser.parse_args(["--run-id", "run-1", "--all-failed"])
+
+    def test_promote_parser_accepts_offline_promotion_options(self) -> None:
+        parser = add_promote_arguments(io_arg_parser("promote-checkpoint"))
+        args = parser.parse_args(["--scenario", "basic", "--episodes", "50"])
+        self.assertEqual(args.config, "default")
+        self.assertEqual(args.select, "exact")
+        self.assertEqual(args.episodes, 50)
+
+    def test_hydrate_parser_accepts_target_mode(self) -> None:
+        parser = add_hydrate_arguments(io_arg_parser("hydrate-workspace"))
+        args = parser.parse_args(["--scenario", "basic", "--only", "active"])
+        self.assertEqual(args.config, "default")
+        self.assertEqual(args.only, "active")
+
+    def test_inspect_run_parser_accepts_json_mode(self) -> None:
+        parser = add_inspect_run_arguments(io_arg_parser("inspect-run"))
+        args = parser.parse_args(["--run-id", "run-123", "--json"])
+        self.assertEqual(args.run_id, "run-123")
+        self.assertTrue(args.json_output)
 
 
 def io_arg_parser(prog: str) -> argparse.ArgumentParser:

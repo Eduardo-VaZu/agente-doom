@@ -11,9 +11,11 @@ class RunArtifactPaths:
     run_id: str
     run_dir: Path
     checkpoints_dir: Path
+    auto_checkpoints_dir: Path
     videos_dir: Path
     tensorboard_dir: Path
     report_path: Path
+    manifest_path: Path
     final_checkpoint_stem: Path
     best_checkpoint_stem: Path
 
@@ -21,13 +23,16 @@ class RunArtifactPaths:
 def build_run_artifact_paths(project_paths: ProjectPaths, run_id: str) -> RunArtifactPaths:
     run_dir = project_paths.runs_dir / run_id
     checkpoints_dir = run_dir / "checkpoints"
+    auto_checkpoints_dir = checkpoints_dir / "auto"
     return RunArtifactPaths(
         run_id=run_id,
         run_dir=run_dir,
         checkpoints_dir=checkpoints_dir,
+        auto_checkpoints_dir=auto_checkpoints_dir,
         videos_dir=run_dir / "videos",
         tensorboard_dir=run_dir / "tensorboard",
         report_path=run_dir / "report.json",
+        manifest_path=run_dir / "manifest.json",
         final_checkpoint_stem=checkpoints_dir / "final_model",
         best_checkpoint_stem=checkpoints_dir / "best_model",
     )

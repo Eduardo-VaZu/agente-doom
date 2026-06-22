@@ -42,6 +42,26 @@ class S3ArtifactStore:
             etag=self._head_etag(object_key),
         )
 
+    def download_file(
+        self,
+        *,
+        object_key: str,
+        local_path: Path,
+    ) -> None:
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self._client.download_file(
+                self._settings.bucket_name,
+                object_key,
+                str(local_path),
+            )
+        except Exception as error:
+            if self._is_missing_object_error(error):
+                raise FileNotFoundError(
+                    f"Objeto remoto no encontrado en S3: {self._settings.bucket_name}/{object_key}"
+                ) from error
+            raise
+
     @property
     def object_prefix(self) -> str:
         return self._settings.object_prefix
@@ -59,6 +79,17 @@ class S3ArtifactStore:
         if etag is None:
             return None
         return str(etag).strip('"')
+
+    @staticmethod
+    def _is_missing_object_error(error: Exception) -> bool:
+        response = getattr(error, "response", None)
+        if not isinstance(response, dict):
+            return False
+        error_payload = response.get("Error")
+        if not isinstance(error_payload, dict):
+            return False
+        error_code = str(error_payload.get("Code", ""))
+        return error_code in {"404", "NoSuchKey", "NotFound"}
 
     @staticmethod
     def _build_client(settings: S3Settings) -> Any:

@@ -38,6 +38,12 @@ class SyncCandidateArtifact:
     run_local_dir: Path
 
 
+@dataclass(frozen=True, slots=True)
+class ArtifactReplacementSummary:
+    inventory_changed: bool
+    has_unsynced_artifacts: bool
+
+
 def build_run_artifact_records(
     report: TrainingRunReportPayload,
     *,
@@ -50,6 +56,13 @@ def build_run_artifact_records(
             local_path=report_path,
         ),
         RunArtifactRecord(
+            artifact_type=ArtifactType.REPORT.value,
+            local_path=Path(report["manifest_path"]),
+            metadata_json={
+                "sidecar_kind": "manifest",
+            },
+        ),
+        RunArtifactRecord(
             artifact_type=ArtifactType.CHECKPOINT.value,
             artifact_role=ArtifactRole.FINAL.value,
             local_path=Path(report["checkpoint_archive_path"]),
@@ -60,19 +73,66 @@ def build_run_artifact_records(
                 ),
             },
         ),
+        RunArtifactRecord(
+            artifact_type=ArtifactType.CHECKPOINT.value,
+            artifact_role=ArtifactRole.FINAL.value,
+            local_path=Path(report["checkpoint_archive_path"]).with_suffix(".json"),
+            metadata_json={
+                "canonical_checkpoint_path": report["checkpoint_path"],
+                "sidecar_kind": "metadata",
+            },
+        ),
     ]
     best_checkpoint_archive_path = report["best_checkpoint_archive_path"]
     if best_checkpoint_archive_path is not None:
+        best_checkpoint_path = Path(best_checkpoint_archive_path)
         records.append(
             RunArtifactRecord(
                 artifact_type=ArtifactType.CHECKPOINT.value,
                 artifact_role=ArtifactRole.BEST.value,
-                local_path=Path(best_checkpoint_archive_path),
+                local_path=best_checkpoint_path,
                 metadata_json={
                     "canonical_checkpoint_path": report["best_checkpoint_path"],
+                    "checkpoint_metadata_path": str(best_checkpoint_path.with_suffix(".json")),
+                },
+            )
+        )
+        records.append(
+            RunArtifactRecord(
+                artifact_type=ArtifactType.CHECKPOINT.value,
+                artifact_role=ArtifactRole.BEST.value,
+                local_path=best_checkpoint_path.with_suffix(".json"),
+                metadata_json={
+                    "canonical_checkpoint_path": report["best_checkpoint_path"],
+                    "sidecar_kind": "metadata",
+                },
+            )
+        )
+    for selected_auto_checkpoint_archive_path in report["selected_auto_checkpoint_archive_paths"]:
+        selected_auto_checkpoint_path = Path(selected_auto_checkpoint_archive_path)
+        records.append(
+            RunArtifactRecord(
+                artifact_type=ArtifactType.CHECKPOINT.value,
+                artifact_role=ArtifactRole.AUTO.value,
+                local_path=selected_auto_checkpoint_path,
+                metadata_json={
+                    "canonical_checkpoint_path": str(selected_auto_checkpoint_path),
                     "checkpoint_metadata_path": str(
-                        Path(best_checkpoint_archive_path).with_suffix(".json")
+                        selected_auto_checkpoint_path.with_suffix(".json")
                     ),
+                    "selection_policy": "latest_only",
+                },
+            )
+        )
+        records.append(
+            RunArtifactRecord(
+                artifact_type=ArtifactType.CHECKPOINT.value,
+                artifact_role=ArtifactRole.AUTO.value,
+                local_path=selected_auto_checkpoint_path.with_suffix(".json"),
+                metadata_json={
+                    "canonical_checkpoint_path": str(selected_auto_checkpoint_path),
+                    "sidecar_kind": "metadata",
+                    "selection_policy": "latest_only",
                 },
             )
         )
@@ -147,11 +207,18 @@ class TrainingRunRepository:
             training_run = session.get(TrainingRun, report["run_id"])
             if training_run is None:
                 training_run = TrainingRun(run_id=report["run_id"])
+            previous_sync_status = getattr(training_run, "sync_status", None)
 
-            self._apply_report(training_run, report, report_path)
-            self._replace_artifacts(
+            artifact_summary = self._replace_artifacts(
                 training_run,
                 build_run_artifact_records(report, report_path=report_path),
+            )
+            self._apply_report(
+                training_run,
+                report,
+                report_path,
+                previous_sync_status=previous_sync_status,
+                artifact_summary=artifact_summary,
             )
             session.add(training_run)
             session.commit()
@@ -372,6 +439,9 @@ class TrainingRunRepository:
         training_run: TrainingRun,
         report: TrainingRunReportPayload,
         report_path: Path,
+        *,
+        previous_sync_status: str | None,
+        artifact_summary: ArtifactReplacementSummary,
     ) -> None:
         training_run.profile_name = report["profile_name"]
         training_run.run_label = report["run_label"]
@@ -394,7 +464,10 @@ class TrainingRunRepository:
         training_run.duration_seconds = report["duration_seconds"]
         training_run.local_run_dir = report["run_dir"]
         training_run.local_report_path = str(report_path)
-        training_run.sync_status = SyncStatus.LOCAL_ONLY.value
+        training_run.sync_status = _next_run_sync_status(
+            previous_sync_status=previous_sync_status,
+            artifact_summary=artifact_summary,
+        )
         training_run.created_at_utc = _parse_datetime(report["created_at_utc"])
         training_run.finished_at_utc = datetime.now(UTC)
 
@@ -402,19 +475,64 @@ class TrainingRunRepository:
         self,
         training_run: TrainingRun,
         artifact_records: list[RunArtifactRecord],
-    ) -> None:
-        training_run.artifacts.clear()
+    ) -> ArtifactReplacementSummary:
+        existing_by_key = {
+            _artifact_identity(artifact): artifact for artifact in training_run.artifacts
+        }
+        next_artifacts: list[RunArtifact] = []
+        inventory_changed = len(existing_by_key) != len(artifact_records)
+        has_unsynced_artifacts = False
+
         for record in artifact_records:
-            training_run.artifacts.append(
-                RunArtifact(
-                    artifact_type=record.artifact_type,
-                    artifact_role=record.artifact_role,
-                    local_path=str(record.local_path),
-                    file_size_bytes=_artifact_size(record.local_path),
-                    metadata_json=_cast_metadata(record.metadata_json),
-                    sync_status=SyncStatus.LOCAL_ONLY.value,
+            artifact_key = _artifact_record_identity(record)
+            existing_artifact = existing_by_key.pop(artifact_key, None)
+            next_file_size = _artifact_size(record.local_path)
+            next_metadata = _cast_metadata(record.metadata_json)
+            if existing_artifact is None:
+                inventory_changed = True
+                next_artifacts.append(
+                    RunArtifact(
+                        artifact_type=record.artifact_type,
+                        artifact_role=record.artifact_role,
+                        local_path=str(record.local_path),
+                        file_size_bytes=next_file_size,
+                        metadata_json=next_metadata,
+                        sync_status=SyncStatus.LOCAL_ONLY.value,
+                    )
                 )
+                has_unsynced_artifacts = True
+                continue
+
+            artifact_changed = (
+                existing_artifact.file_size_bytes != next_file_size
+                or existing_artifact.metadata_json != next_metadata
             )
+            if artifact_changed:
+                inventory_changed = True
+                existing_artifact.storage_backend = None
+                existing_artifact.bucket_name = None
+                existing_artifact.object_key = None
+                existing_artifact.remote_uri = None
+                existing_artifact.uploaded_at_utc = None
+                existing_artifact.sync_error = None
+                existing_artifact.sync_status = SyncStatus.LOCAL_ONLY.value
+
+            existing_artifact.file_size_bytes = next_file_size
+            existing_artifact.metadata_json = next_metadata
+            has_unsynced_artifacts = has_unsynced_artifacts or (
+                existing_artifact.sync_status != SyncStatus.SYNCED.value
+            )
+            next_artifacts.append(existing_artifact)
+
+        if existing_by_key:
+            inventory_changed = True
+            has_unsynced_artifacts = True
+
+        training_run.artifacts[:] = next_artifacts
+        return ArtifactReplacementSummary(
+            inventory_changed=inventory_changed,
+            has_unsynced_artifacts=has_unsynced_artifacts,
+        )
 
     def _finish_sync_event(
         self,
@@ -482,10 +600,21 @@ def _find_artifact(
     artifact_type: str,
     artifact_role: str | None,
 ) -> RunArtifact | None:
+    metadata_sidecar_match: RunArtifact | None = None
     for artifact in training_run.artifacts:
         if artifact.artifact_type == artifact_type and artifact.artifact_role == artifact_role:
-            return artifact
-    return None
+            if not _is_metadata_sidecar(artifact):
+                return artifact
+            if metadata_sidecar_match is None:
+                metadata_sidecar_match = artifact
+    return metadata_sidecar_match
+
+
+def _is_metadata_sidecar(artifact: RunArtifact) -> bool:
+    if artifact.metadata_json is None:
+        return False
+    sidecar_kind = artifact.metadata_json.get("sidecar_kind")
+    return sidecar_kind == "metadata"
 
 
 def _artifact_path(artifact: RunArtifact | None) -> str:
@@ -508,6 +637,26 @@ def _required_artifact_metadata_value(artifact: RunArtifact | None, key: str) ->
     if value is None:
         return ""
     return value
+
+
+def _artifact_record_identity(record: RunArtifactRecord) -> tuple[str, str | None, str]:
+    return (record.artifact_type, record.artifact_role, str(record.local_path))
+
+
+def _artifact_identity(artifact: RunArtifact) -> tuple[str, str | None, str]:
+    return (artifact.artifact_type, artifact.artifact_role, artifact.local_path)
+
+
+def _next_run_sync_status(
+    *,
+    previous_sync_status: str | None,
+    artifact_summary: ArtifactReplacementSummary,
+) -> str:
+    if artifact_summary.has_unsynced_artifacts:
+        return SyncStatus.LOCAL_ONLY.value
+    if previous_sync_status is None:
+        return SyncStatus.LOCAL_ONLY.value
+    return previous_sync_status
 
 
 def _get_artifact(session: Session, artifact_id: int) -> RunArtifact:

@@ -9,7 +9,7 @@ from doom_agent.utils.checkpoints import (
     ResolvedCheckpoint,
     checkpoint_zip_path,
     resolve_checkpoint,
-    resolve_latest_checkpoint,
+    resolve_resume_checkpoint,
 )
 
 AUTO_RESUME_MODE = "auto"
@@ -87,7 +87,7 @@ def resolve_resume_state(
         return ResumeState(mode="from_scratch", checkpoint=None)
 
     if resume_mode in {AUTO_RESUME_MODE, LATEST_RESUME_MODE}:
-        checkpoint = resolve_latest_checkpoint(project_paths, profile.checkpoint_name)
+        checkpoint = resolve_resume_checkpoint(project_paths, profile.checkpoint_name)
         if checkpoint is None:
             return ResumeState(mode=resume_mode, checkpoint=None)
     else:

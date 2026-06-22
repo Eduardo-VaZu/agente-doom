@@ -8,10 +8,8 @@ from doom_agent.persistence.repositories import SyncCandidateArtifact, TrainingR
 from doom_agent.storage import (
     DEFAULT_OBJECT_PREFIX,
     ArtifactStore,
-    MinioArtifactStore,
     S3ArtifactStore,
     build_remote_object_key,
-    get_storage_backend,
     guess_content_type,
 )
 
@@ -101,7 +99,7 @@ class ArtifactSyncService:
         if object_prefix is not None:
             normalized_prefix = object_prefix.strip("/")
             self._object_prefix = normalized_prefix or DEFAULT_OBJECT_PREFIX
-        elif isinstance(configured_artifact_store, (MinioArtifactStore, S3ArtifactStore)):
+        elif isinstance(configured_artifact_store, S3ArtifactStore):
             self._object_prefix = configured_artifact_store.object_prefix
         else:
             self._object_prefix = DEFAULT_OBJECT_PREFIX
@@ -224,11 +222,8 @@ class ArtifactSyncService:
 
 
 def _build_default_artifact_store() -> ArtifactStore:
-    backend = get_storage_backend()
-    if backend == "s3":
-        return S3ArtifactStore()
-    return MinioArtifactStore()
+    return S3ArtifactStore()
 
 
 def _resolve_storage_backend_name(artifact_store: ArtifactStore) -> str:
-    return str(getattr(artifact_store, "storage_backend", get_storage_backend()))
+    return str(getattr(artifact_store, "storage_backend", "s3"))
