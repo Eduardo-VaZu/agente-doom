@@ -9,6 +9,7 @@ import numpy as np
 from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.logger import HumanOutputFormat
 from stable_baselines3.common.vec_env import VecEnv
 
 from doom_agent.config.schema import TrainingProfile
@@ -34,6 +35,9 @@ if TYPE_CHECKING:
     from doom_agent.utils.checkpoints import ResolvedCheckpoint
 
 
+CONSOLE_LOGGER_MAX_LENGTH = 56
+
+
 @dataclass(frozen=True, slots=True)
 class EvaluationSettings:
     frequency: int
@@ -55,7 +59,9 @@ def load_training_model(
     resume_state: ResumeState,
 ) -> RecurrentPPO:
     if not resume_state.is_resumed:
-        return build_recurrent_ppo_model(env, profile, str(tensorboard_dir))
+        model = build_recurrent_ppo_model(env, profile, str(tensorboard_dir))
+        _widen_human_logger_columns(model)
+        return model
 
     assert resume_state.checkpoint is not None
     model = RecurrentPPO.load(
@@ -64,7 +70,14 @@ def load_training_model(
     )
     model.set_random_seed(profile.seed)
     model.tensorboard_log = str(tensorboard_dir)
+    _widen_human_logger_columns(model)
     return model
+
+
+def _widen_human_logger_columns(model: RecurrentPPO) -> None:
+    for output_format in model.logger.output_formats:
+        if isinstance(output_format, HumanOutputFormat):
+            output_format.max_length = CONSOLE_LOGGER_MAX_LENGTH
 
 
 def _mean_reward_from_metrics(
