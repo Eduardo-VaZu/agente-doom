@@ -136,3 +136,30 @@ Cada entrada debe incluir:
   - alinear documentacion con el flujo real de `promoted`, `manifest` y `hydrate`
   - definir politica simple de retencion/limpieza de artefactos
   - decidir si `basic` se congela como baseline oficial o si abre iteracion `v2`
+
+### 2026-06-22
+
+- escenario: `basic`
+- fase entrenamiento: `Fase 1`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo corrida larga oficial de `basic`
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `final_model.zip` como checkpoint oficial del escenario
+  - se documento TensorBoard y lectura de metricas para presentacion
+- comando ejecutado:
+  - `make train-from-scratch`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__20260622T024012285164Z\checkpoints\best_model.zip --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__20260622T024012285164Z\checkpoints\final_model.zip --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__20260622T024012285164Z\checkpoints\final_model.zip --episodes 50`
+- resultado observado:
+  - `basic` quedo cerrado con checkpoint oficial promovido
+  - metricas finales oficiales:
+    - `mean_reward = -11.84`
+    - `std_reward = 11.26`
+    - `mean_episode_length = 13.84`
+  - el `final_model.zip` supero al `best_model.zip` cuando se comparo offline con `50` episodios
+- decision siguiente:
+  - congelar `basic` como baseline oficial
+  - abrir `defend_the_center` como primer escenario de transferencia
+  - correr piloto inicial desde `doom_foundation_agent_promoted.zip`

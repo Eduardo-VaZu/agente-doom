@@ -134,3 +134,15 @@ class EnvironmentSmokeTests(unittest.TestCase):
             )
         finally:
             env.close()
+
+    def test_defend_the_center_turn_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="defend_the_center")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
+            )
+        finally:
+            env.close()

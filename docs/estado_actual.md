@@ -12,10 +12,12 @@ Fecha base: 2026-06-20
 ## Resumen ejecutivo
 
 - modelo actual: `foundation`
-- fase actual de entrenamiento: `Fase 1`
+- fase actual de entrenamiento: `Fase 2`
 - fase actual de storage: `Fase 2`
-- escenario activo: `basic`
-- configuracion activa: [configs/base.toml](/E:/agente-doom/configs/base.toml:1) + [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml:1)
+- escenario baseline oficial: `basic`
+- siguiente escenario activo: `defend_the_center`
+- configuracion baseline: [configs/base.toml](/E:/agente-doom/configs/base.toml:1) + [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml:1)
+- configuracion siguiente: [configs/scenarios/defend_the_center.toml](/E:/agente-doom/configs/scenarios/defend_the_center.toml:1)
 - flujo principal: `make train`
 - flujo recomendado inicial: `make train-from-scratch`
 - metadata remota activa: `Neon / PostgreSQL`
@@ -24,11 +26,11 @@ Fecha base: 2026-06-20
 
 ## Foco actual
 
-- estabilizar entrenamiento de `basic`
+- validar transferencia desde `basic` hacia `defend_the_center`
 - consolidar flujo oficial de entrenamiento, promotion y handoff multi-PC
 - dejar storage remoto mas legible para el equipo entre varias corridas
 - terminar de alinear documentacion con `manifest`, `promoted` y `hydrate`
-- decidir siguiente iteracion sana despues del baseline largo de `basic`
+- consolidar protocolo del primer piloto de `defend_the_center`
 
 ## Ya implementado
 
@@ -113,8 +115,9 @@ Comandos principales disponibles:
 
 ### Estado empirico reciente
 
-- baseline larga de `basic` ya corrida
-- checkpoint promovido disponible para continuidad y evaluacion oficial
+- baseline larga de `basic` ya cerrada como referencia oficial
+- checkpoint promovido disponible para continuidad y transferencia
+- `defend_the_center` ya incorporado al catalogo local con config propia
 - auto-checkpoints sirven como soporte local, no como fuente oficial de verdad para handoff
 
 ## Bloqueos o riesgos actuales
@@ -122,7 +125,7 @@ Comandos principales disponibles:
 - falta registrar mejor el historial empirico reciente en `experiment_log.md`
 - falta definir politica operativa simple de limpieza y retencion de artefactos
 - auto-checkpoints siguen fuera del handoff oficial
-- falta decidir si `basic` queda congelado como baseline o si abre una `v2`
+- falta correr y validar el primer piloto de `defend_the_center`
 
 ## Operacion recomendada hoy
 
@@ -143,4 +146,8 @@ Comandos principales disponibles:
 3. usar `make promote CHECKPOINT=... PROMOTE_EPISODES=50` cuando un checkpoint merezca quedar como referencia
 4. usar `make hydrate ONLY=promoted` en otra PC si hace falta continuidad
 5. registrar resultado en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
-6. decidir si `basic` queda congelado como baseline o si abre una `v2`
+6. correr piloto de `defend_the_center` por transferencia desde `promoted`:
+
+```powershell
+.\.venv\Scripts\python.exe src\cli.py train --scenario defend_the_center --resume artifacts\checkpoints\doom_foundation_agent_promoted.zip --allow-scenario-resume --seed 42 --timesteps 300000
+```

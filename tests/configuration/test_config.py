@@ -40,7 +40,7 @@ class TrainingProfileTests(unittest.TestCase):
         catalog = load_training_catalog()
         self.assertIn("default", catalog.profiles)
         self.assertEqual(tuple(catalog.profiles), ("default",))
-        self.assertEqual(tuple(catalog.scenarios), ("basic",))
+        self.assertEqual(tuple(catalog.scenarios), ("basic", "defend_the_center"))
 
     def test_project_paths_include_local_runs_directory(self) -> None:
         project_paths = build_project_paths()
@@ -93,6 +93,15 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual(profile.eval_episodes, 20)
         self.assertEqual(profile.video_record_frequency, 200000)
         self.assertEqual(profile.video_length, 1000)
+
+    def test_defend_the_center_scenario_uses_turn_combat_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="defend_the_center")
+        self.assertEqual(profile.scenario_name, "defend_the_center.cfg")
+        self.assertEqual(profile.action_combo_preset, "turn_combat")
+        self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
 
     def test_profile_roundtrip_preserves_evaluation_defaults(self) -> None:
         profile = get_training_profile("default")

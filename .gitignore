@@ -11,6 +11,3 @@ logs/
 data/videos/
 _vizdoom.ini
 .DS_Store
-
-.agents
-skills-lock.json
