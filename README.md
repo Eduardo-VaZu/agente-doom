@@ -21,6 +21,7 @@ Este proyecto hace cinco cosas principales:
 - [Inicio rapido](#inicio-rapido)
 - [Flujo recomendado](#flujo-recomendado)
 - [Comandos principales](#comandos-principales)
+- [TensorBoard y metricas](#tensorboard-y-metricas)
 - [Storage remoto](#storage-remoto)
 - [Mapa de documentacion](#mapa-de-documentacion)
 
@@ -175,6 +176,29 @@ make list-runs
 make list-checkpoints
 ```
 
+## TensorBoard y metricas
+
+TensorBoard ya produce los graficos; no hace falta reentrenar para explicar que significa cada uno.
+
+La leyenda operativa del proyecto vive en:
+
+- [docs/tensorboard_metricas.md](/E:/agente-doom/docs/tensorboard_metricas.md:1)
+
+Uso rapido:
+
+- `rollout/`: comportamiento durante entrenamiento
+- `eval/`: calidad del checkpoint en evaluacion periodica
+- `train/`: senales internas de optimizacion PPO
+- `time/`: velocidad y progreso de corrida
+
+Para presentacion, prioriza:
+
+- `eval/mean_reward`
+- `eval/std_reward`
+- `eval/mean_episode_length`
+- `eval/actions/*`
+- `time/fps`
+
 Variables utiles:
 
 - `SEED=42`
@@ -267,6 +291,9 @@ Este mapa usa la misma estructura consolidada de la carpeta `docs`.
 - [estructura_repo.md](/E:/agente-doom/docs/estructura_repo.md:1)
   Mapa del repo por carpetas, modulos y archivos clave. Responde: donde vive cada responsabilidad y que hace cada pieza.
 
+- [tensorboard_metricas.md](/E:/agente-doom/docs/tensorboard_metricas.md:1)
+  Leyenda practica de metricas y graficos de TensorBoard. Responde: como leer cada grafico y cual usar para presentar resultados.
+
 ### Como usarlos juntos
 
 1. Abre [estado_actual.md](/E:/agente-doom/docs/estado_actual.md:1)
@@ -285,9 +312,11 @@ Este mapa usa la misma estructura consolidada de la carpeta `docs`.
 
 7. Si necesitas mapa de modulos y archivos, abre [estructura_repo.md](/E:/agente-doom/docs/estructura_repo.md:1)
 
-8. Si necesitas agregar un escenario nuevo, abre [how_to_add_scenario.md](/E:/agente-doom/docs/how_to_add_scenario.md:1)
+8. Si necesitas leer TensorBoard o explicar metricas en una presentacion, abre [tensorboard_metricas.md](/E:/agente-doom/docs/tensorboard_metricas.md:1)
 
-9. Si necesitas revisar universo oficial de ViZDoom, abre [vizdoom_escenarios_oficiales.md](/E:/agente-doom/docs/vizdoom_escenarios_oficiales.md:1)
+9. Si necesitas agregar un escenario nuevo, abre [how_to_add_scenario.md](/E:/agente-doom/docs/how_to_add_scenario.md:1)
+
+10. Si necesitas revisar universo oficial de ViZDoom, abre [vizdoom_escenarios_oficiales.md](/E:/agente-doom/docs/vizdoom_escenarios_oficiales.md:1)
 
 ## Ayuda
 

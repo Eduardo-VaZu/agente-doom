@@ -88,6 +88,10 @@ Cuando usarlo:
 - mientras entrena una corrida
 - cuando quieres revisar curvas por `run_id`
 
+Apoyo recomendado:
+- abre tambien [tensorboard_metricas.md](/E:/agente-doom/docs/tensorboard_metricas.md:1)
+- ahi esta la leyenda de `rollout/`, `eval/`, `train/` y `time/`
+
 ## Evaluacion
 
 ### `make evaluate`

@@ -140,7 +140,9 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         self.action_combo_preset = action_combo_preset
         self.render_mode = render_mode
         self.reward_shaper = reward_shaper
-        self.available_button_names = tuple(button_name(button) for button in self.game.get_available_buttons())
+        self.available_button_names = tuple(
+            button_name(button) for button in self.game.get_available_buttons()
+        )
         self.action_labels: tuple[str, ...] = ()
         self.action_definitions: tuple[BinaryAction, ...] = ()
         self.action_space: gym.Space[Any]
