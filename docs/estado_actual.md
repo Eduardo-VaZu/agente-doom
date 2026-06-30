@@ -7,7 +7,7 @@ Sirve para responder dos preguntas sin saltar entre varios archivos:
 - en que estamos hoy
 - que ya existe realmente en codigo y operacion
 
-Fecha base: 2026-06-20
+Fecha base: 2026-06-29
 
 ## Resumen ejecutivo
 
@@ -15,9 +15,10 @@ Fecha base: 2026-06-20
 - fase actual de entrenamiento: `Fase 2`
 - fase actual de storage: `Fase 2`
 - escenario baseline oficial: `basic`
-- siguiente escenario activo: `defend_the_center`
+- escenario activo oficial: `health_gathering`
 - configuracion baseline: [configs/base.toml](/E:/agente-doom/configs/base.toml:1) + [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml:1)
-- configuracion siguiente: [configs/scenarios/defend_the_center.toml](/E:/agente-doom/configs/scenarios/defend_the_center.toml:1)
+- configuracion activa: [configs/scenarios/health_gathering.toml](/E:/agente-doom/configs/scenarios/health_gathering.toml:1)
+- siguiente escenario sugerido: `take_cover`
 - flujo principal: `make train`
 - flujo recomendado inicial: `make train-from-scratch`
 - metadata remota activa: `Neon / PostgreSQL`
@@ -26,11 +27,10 @@ Fecha base: 2026-06-20
 
 ## Foco actual
 
-- validar transferencia desde `basic` hacia `defend_the_center`
 - consolidar flujo oficial de entrenamiento, promotion y handoff multi-PC
 - dejar storage remoto mas legible para el equipo entre varias corridas
 - terminar de alinear documentacion con `manifest`, `promoted` y `hydrate`
-- consolidar protocolo del primer piloto de `defend_the_center`
+- cerrar administrativamente `health_gathering` y preparar apertura del siguiente escenario del curriculum
 
 ## Ya implementado
 
@@ -118,14 +118,31 @@ Comandos principales disponibles:
 - baseline larga de `basic` ya cerrada como referencia oficial
 - checkpoint promovido disponible para continuidad y transferencia
 - `defend_the_center` ya incorporado al catalogo local con config propia
+- validacion inicial de `defend_the_center` completada por transferencia desde `basic`
+- corrida inicial validada: `doom_foundation_agent__defend_the_center__20260623T025602580980Z`
+- corrida de mejora validada: `doom_foundation_agent__defend_the_center__20260625T025825622091Z`
+- `health_gathering` ya incorporado al catalogo local con config propia
+- piloto inicial validado: `doom_foundation_agent__health_gathering__20260625T113629214351Z`
+- corrida de mejora validada: `doom_foundation_agent__health_gathering__20260626T014540629370Z`
+- checkpoint oficial promovido de `defend_the_center`:
+  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip`
+- metricas oficiales offline de `50` episodios para `best_model.zip` promovido:
+  - `mean_reward = 9.90`
+  - `std_reward = 1.38`
+  - `mean_episode_length = 634.12`
+- checkpoint oficial promovido de `health_gathering`:
+  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip`
+- metricas oficiales offline de `50` episodios para `best_model.zip` promovido:
+  - `mean_reward = 1580.28`
+  - `std_reward = 736.36`
+  - `mean_episode_length = 1581.04`
 - auto-checkpoints sirven como soporte local, no como fuente oficial de verdad para handoff
 
 ## Bloqueos o riesgos actuales
 
-- falta registrar mejor el historial empirico reciente en `experiment_log.md`
 - falta definir politica operativa simple de limpieza y retencion de artefactos
 - auto-checkpoints siguen fuera del handoff oficial
-- falta correr y validar el primer piloto de `defend_the_center`
+- falta preparar formalmente el siguiente escenario del curriculum con config y protocolo inicial
 
 ## Operacion recomendada hoy
 
@@ -146,8 +163,8 @@ Comandos principales disponibles:
 3. usar `make promote CHECKPOINT=... PROMOTE_EPISODES=50` cuando un checkpoint merezca quedar como referencia
 4. usar `make hydrate ONLY=promoted` en otra PC si hace falta continuidad
 5. registrar resultado en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
-6. correr piloto de `defend_the_center` por transferencia desde `promoted`:
+6. si se abre `take_cover`, usar el checkpoint promovido de `health_gathering` como referencia de transferencia:
 
 ```powershell
-.\.venv\Scripts\python.exe src\cli.py train --scenario defend_the_center --resume artifacts\checkpoints\doom_foundation_agent_promoted.zip --allow-scenario-resume --seed 42 --timesteps 300000
+.\.venv\Scripts\python.exe src\cli.py train --scenario take_cover --resume artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip --allow-scenario-resume --seed 42 --timesteps 300000
 ```

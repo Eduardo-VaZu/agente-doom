@@ -146,3 +146,15 @@ class EnvironmentSmokeTests(unittest.TestCase):
             )
         finally:
             env.close()
+
+    def test_health_gathering_navigation_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="health_gathering")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("MOVE_FORWARD", "TURN_LEFT+MOVE_FORWARD", "TURN_RIGHT+MOVE_FORWARD"),
+            )
+        finally:
+            env.close()

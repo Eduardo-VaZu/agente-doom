@@ -163,3 +163,133 @@ Cada entrada debe incluir:
   - congelar `basic` como baseline oficial
   - abrir `defend_the_center` como primer escenario de transferencia
   - correr piloto inicial desde `doom_foundation_agent_promoted.zip`
+
+### 2026-06-24
+
+- escenario: `defend_the_center`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo primer piloto por transferencia desde checkpoint promovido de `basic`
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `best_model.zip` como checkpoint oficial del escenario
+  - se cerro administrativamente validacion inicial de `defend_the_center`
+- comando ejecutado:
+  - `make train SCENARIO=defend_the_center RESUME=artifacts\checkpoints\doom_foundation_agent_promoted.zip ALLOW_SCENARIO_RESUME=1 SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_center__20260623T025602580980Z\checkpoints\best_model.zip --scenario defend_the_center --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_center__20260623T025602580980Z\checkpoints\final_model.zip --scenario defend_the_center --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__defend_the_center__20260623T025602580980Z\checkpoints\best_model.zip --scenario defend_the_center --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__defend_the_center__20260623T025602580980Z`
+  - `best_model.zip` supero a `final_model.zip` en evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 7.98`
+    - `std_reward = 1.30`
+    - `mean_episode_length = 650.48`
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip`
+- decision siguiente:
+  - decidir si `defend_the_center` recibe segundo tramo de entrenamiento o si se congela como referencia de Fase 2
+  - si se extiende, reanudar desde checkpoint promovido del escenario
+  - si no se extiende, abrir siguiente escenario del curriculum
+
+### 2026-06-25
+
+- escenario: `defend_the_center`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo un segundo tramo de entrenamiento reanudando desde checkpoint promovido del escenario
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `best_model.zip` mejorado como nuevo checkpoint oficial del escenario
+  - se cerro `defend_the_center` con una referencia final mas fuerte
+- comando ejecutado:
+  - `make train SCENARIO=defend_the_center RESUME=artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_center__20260625T025825622091Z\checkpoints\final_model.zip --scenario defend_the_center --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_center__20260625T025825622091Z\checkpoints\best_model.zip --scenario defend_the_center --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__defend_the_center__20260625T025825622091Z\checkpoints\best_model.zip --scenario defend_the_center --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__defend_the_center__20260625T025825622091Z`
+  - `best_model.zip` supero a `final_model.zip` y al checkpoint promovido anterior en evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 9.90`
+    - `std_reward = 1.38`
+    - `mean_episode_length = 634.12`
+  - sesgo de acciones mejoro respecto al piloto inicial, aunque no desaparecio por completo
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip`
+- decision siguiente:
+  - congelar `defend_the_center` como referencia fuerte de Fase 2
+  - abrir el siguiente escenario del curriculum con config y protocolo inicial
+
+### 2026-06-25
+
+- escenario: `health_gathering`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se incorporo `health_gathering` al catalogo local como siguiente escenario preparado
+  - se agregaron assets oficiales `.cfg` y `.wad`
+  - se agrego config de escenario y tests minimos del preset de navegacion
+- comando ejecutado:
+  - integracion local en repo
+- resultado observado:
+  - `health_gathering` ya existe en `configs/scenarios/` y `data/scenarios/`
+  - el preset esperado queda definido como `health_navigation`
+  - el escenario queda listo para piloto inicial por transferencia o desde cero
+- decision siguiente:
+  - correr piloto inicial de `health_gathering`
+  - validar `best_model.zip` y `final_model.zip` offline con `50` episodios
+
+### 2026-06-25
+
+- escenario: `health_gathering`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo piloto inicial por transferencia desde `defend_the_center`
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `best_model.zip` como checkpoint oficial inicial del escenario
+- comando ejecutado:
+  - `make train SCENARIO=health_gathering RESUME=artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip ALLOW_SCENARIO_RESUME=1 SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__health_gathering__20260625T113629214351Z\checkpoints\best_model.zip --scenario health_gathering --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__health_gathering__20260625T113629214351Z\checkpoints\final_model.zip --scenario health_gathering --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__health_gathering__20260625T113629214351Z\checkpoints\best_model.zip --scenario health_gathering --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__health_gathering__20260625T113629214351Z`
+  - `best_model.zip` supero ampliamente a `final_model.zip` en evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 1539.16`
+    - `std_reward = 635.51`
+    - `mean_episode_length = 1541.04`
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip`
+- decision siguiente:
+  - decidir si `health_gathering` recibe un ultimo tramo de mejora o si se congela como referencia fuerte de Fase 2
+
+### 2026-06-26
+
+- escenario: `health_gathering`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo un tramo adicional de mejora reanudando desde checkpoint promovido del escenario
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `best_model.zip` mejorado como nuevo checkpoint oficial del escenario
+- comando ejecutado:
+  - `make train SCENARIO=health_gathering RESUME=artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__health_gathering__20260626T014540629370Z\checkpoints\final_model.zip --scenario health_gathering --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__health_gathering__20260626T014540629370Z\checkpoints\best_model.zip --scenario health_gathering --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__health_gathering__20260626T014540629370Z\checkpoints\best_model.zip --scenario health_gathering --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__health_gathering__20260626T014540629370Z`
+  - `best_model.zip` supero a `final_model.zip` y al checkpoint promovido anterior en evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 1580.28`
+    - `std_reward = 736.36`
+    - `mean_episode_length = 1581.04`
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip`
+- decision siguiente:
+  - congelar `health_gathering` como referencia fuerte de Fase 2
+  - abrir el siguiente escenario del curriculum

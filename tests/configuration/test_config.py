@@ -40,7 +40,10 @@ class TrainingProfileTests(unittest.TestCase):
         catalog = load_training_catalog()
         self.assertIn("default", catalog.profiles)
         self.assertEqual(tuple(catalog.profiles), ("default",))
-        self.assertEqual(tuple(catalog.scenarios), ("basic", "defend_the_center"))
+        self.assertEqual(
+            tuple(catalog.scenarios),
+            ("basic", "defend_the_center", "health_gathering"),
+        )
 
     def test_project_paths_include_local_runs_directory(self) -> None:
         project_paths = build_project_paths()
@@ -98,6 +101,15 @@ class TrainingProfileTests(unittest.TestCase):
         profile = get_training_profile("default", scenario_name="defend_the_center")
         self.assertEqual(profile.scenario_name, "defend_the_center.cfg")
         self.assertEqual(profile.action_combo_preset, "turn_combat")
+        self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
+    def test_health_gathering_scenario_uses_navigation_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="health_gathering")
+        self.assertEqual(profile.scenario_name, "health_gathering.cfg")
+        self.assertEqual(profile.action_combo_preset, "health_navigation")
         self.assertEqual(profile.requested_timesteps, 300000)
         self.assertEqual(profile.eval_episodes, 20)
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)

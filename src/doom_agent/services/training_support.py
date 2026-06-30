@@ -59,9 +59,7 @@ def load_training_model(
     resume_state: ResumeState,
 ) -> RecurrentPPO:
     if not resume_state.is_resumed:
-        model = build_recurrent_ppo_model(env, profile, str(tensorboard_dir))
-        _widen_human_logger_columns(model)
-        return model
+        return build_recurrent_ppo_model(env, profile, str(tensorboard_dir))
 
     assert resume_state.checkpoint is not None
     model = RecurrentPPO.load(
@@ -70,11 +68,12 @@ def load_training_model(
     )
     model.set_random_seed(profile.seed)
     model.tensorboard_log = str(tensorboard_dir)
-    _widen_human_logger_columns(model)
     return model
 
 
 def _widen_human_logger_columns(model: RecurrentPPO) -> None:
+    if not hasattr(model, "_logger"):
+        return
     for output_format in model.logger.output_formats:
         if isinstance(output_format, HumanOutputFormat):
             output_format.max_length = CONSOLE_LOGGER_MAX_LENGTH
@@ -199,6 +198,7 @@ class PeriodicTrainingCallback(BaseCallback):
         self.action_labels: tuple[str, ...] = ()
 
     def _on_training_start(self) -> None:
+        _widen_human_logger_columns(cast(RecurrentPPO, self.model))
         current_timesteps = self.model.num_timesteps
         self.next_checkpoint_step = _next_multiple(
             current_timesteps, self.profile.checkpoint_frequency
