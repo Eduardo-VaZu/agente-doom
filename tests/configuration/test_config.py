@@ -42,7 +42,15 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual(tuple(catalog.profiles), ("default",))
         self.assertEqual(
             tuple(catalog.scenarios),
-            ("basic", "defend_the_center", "health_gathering"),
+            (
+                "basic",
+                "basic_audio",
+                "basic_notifications",
+                "defend_the_center",
+                "defend_the_line",
+                "health_gathering",
+                "take_cover",
+            ),
         )
 
     def test_project_paths_include_local_runs_directory(self) -> None:
@@ -106,10 +114,46 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)
         self.assertEqual(profile.reward_shaping.clip_max, 1.0)
 
+    def test_basic_audio_scenario_uses_basic_combat_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="basic_audio")
+        self.assertEqual(profile.scenario_name, "basic_audio.cfg")
+        self.assertEqual(profile.action_combo_preset, "basic_combat")
+        self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
+    def test_basic_notifications_scenario_uses_basic_combat_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="basic_notifications")
+        self.assertEqual(profile.scenario_name, "basic_notifications.cfg")
+        self.assertEqual(profile.action_combo_preset, "basic_combat")
+        self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
     def test_health_gathering_scenario_uses_navigation_profile(self) -> None:
         profile = get_training_profile("default", scenario_name="health_gathering")
         self.assertEqual(profile.scenario_name, "health_gathering.cfg")
         self.assertEqual(profile.action_combo_preset, "health_navigation")
+        self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
+    def test_take_cover_scenario_uses_dodge_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="take_cover")
+        self.assertEqual(profile.scenario_name, "take_cover.cfg")
+        self.assertEqual(profile.action_combo_preset, "take_cover_dodge")
+        self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
+    def test_defend_the_line_scenario_uses_turn_combat_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="defend_the_line")
+        self.assertEqual(profile.scenario_name, "defend_the_line.cfg")
+        self.assertEqual(profile.action_combo_preset, "turn_combat")
         self.assertEqual(profile.requested_timesteps, 300000)
         self.assertEqual(profile.eval_episodes, 20)
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)

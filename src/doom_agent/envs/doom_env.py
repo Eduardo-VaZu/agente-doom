@@ -104,6 +104,11 @@ def build_button_combination_actions(
         add_action(("TURN_RIGHT", "MOVE_FORWARD"))
         return tuple(labels), tuple(actions)
 
+    if preset == "take_cover_dodge":
+        add_action(("MOVE_LEFT",))
+        add_action(("MOVE_RIGHT",))
+        return tuple(labels), tuple(actions)
+
     actions.append(np.zeros(len(available_button_names), dtype=np.int32))
     labels.append(("NOOP",))
 

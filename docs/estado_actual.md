@@ -7,18 +7,18 @@ Sirve para responder dos preguntas sin saltar entre varios archivos:
 - en que estamos hoy
 - que ya existe realmente en codigo y operacion
 
-Fecha base: 2026-06-29
+Fecha base: 2026-07-03
 
 ## Resumen ejecutivo
 
 - modelo actual: `foundation`
-- fase actual de entrenamiento: `Fase 2`
+- fase actual de entrenamiento: `Fase 3`
 - fase actual de storage: `Fase 2`
 - escenario baseline oficial: `basic`
-- escenario activo oficial: `health_gathering`
+- escenario activo oficial: `defend_the_line`
 - configuracion baseline: [configs/base.toml](/E:/agente-doom/configs/base.toml:1) + [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml:1)
-- configuracion activa: [configs/scenarios/health_gathering.toml](/E:/agente-doom/configs/scenarios/health_gathering.toml:1)
-- siguiente escenario sugerido: `take_cover`
+- configuracion activa: [configs/scenarios/defend_the_line.toml](/E:/agente-doom/configs/scenarios/defend_the_line.toml:1)
+- siguiente escenario sugerido: `basic_audio` como siguiente integracion de Fase 3
 - flujo principal: `make train`
 - flujo recomendado inicial: `make train-from-scratch`
 - metadata remota activa: `Neon / PostgreSQL`
@@ -30,7 +30,7 @@ Fecha base: 2026-06-29
 - consolidar flujo oficial de entrenamiento, promotion y handoff multi-PC
 - dejar storage remoto mas legible para el equipo entre varias corridas
 - terminar de alinear documentacion con `manifest`, `promoted` y `hydrate`
-- cerrar administrativamente `health_gathering` y preparar apertura del siguiente escenario del curriculum
+- cerrar administrativamente `defend_the_line` y preparar apertura del siguiente escenario del curriculum especializado
 
 ## Ya implementado
 
@@ -124,6 +124,10 @@ Comandos principales disponibles:
 - `health_gathering` ya incorporado al catalogo local con config propia
 - piloto inicial validado: `doom_foundation_agent__health_gathering__20260625T113629214351Z`
 - corrida de mejora validada: `doom_foundation_agent__health_gathering__20260626T014540629370Z`
+- `take_cover` ya incorporado al catalogo local con config propia
+- piloto inicial validado: `doom_foundation_agent__take_cover__20260630T011932555138Z`
+- corrida de mejora validada: `doom_foundation_agent__take_cover__20260703T140745071243Z`
+- `defend_the_line` ya incorporado al catalogo local con config propia
 - checkpoint oficial promovido de `defend_the_center`:
   - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip`
 - metricas oficiales offline de `50` episodios para `best_model.zip` promovido:
@@ -136,13 +140,28 @@ Comandos principales disponibles:
   - `mean_reward = 1580.28`
   - `std_reward = 736.36`
   - `mean_episode_length = 1581.04`
+- checkpoint oficial promovido de `take_cover`:
+  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__take_cover_promoted.zip`
+- metricas oficiales offline de `50` episodios para checkpoint promovido:
+  - `mean_reward = 331.90`
+  - `std_reward = 178.23`
+  - `mean_episode_length = 331.90`
+- corridas validadas de `defend_the_line`:
+  - `doom_foundation_agent__defend_the_line__20260703T195759636148Z`
+  - `doom_foundation_agent__defend_the_line__20260703T231100240178Z`
+- checkpoint oficial promovido de `defend_the_line`:
+  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_line_promoted.zip`
+- metricas oficiales offline de `50` episodios para `best_model.zip` promovido:
+  - `mean_reward = 27.06`
+  - `std_reward = 7.43`
+  - `mean_episode_length = 1026.78`
 - auto-checkpoints sirven como soporte local, no como fuente oficial de verdad para handoff
 
 ## Bloqueos o riesgos actuales
 
 - falta definir politica operativa simple de limpieza y retencion de artefactos
 - auto-checkpoints siguen fuera del handoff oficial
-- falta preparar formalmente el siguiente escenario del curriculum con config y protocolo inicial
+- falta preparar formalmente el siguiente escenario de Fase 3 con config y protocolo inicial
 
 ## Operacion recomendada hoy
 
@@ -163,8 +182,4 @@ Comandos principales disponibles:
 3. usar `make promote CHECKPOINT=... PROMOTE_EPISODES=50` cuando un checkpoint merezca quedar como referencia
 4. usar `make hydrate ONLY=promoted` en otra PC si hace falta continuidad
 5. registrar resultado en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
-6. si se abre `take_cover`, usar el checkpoint promovido de `health_gathering` como referencia de transferencia:
-
-```powershell
-.\.venv\Scripts\python.exe src\cli.py train --scenario take_cover --resume artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip --allow-scenario-resume --seed 42 --timesteps 300000
-```
+6. preparar siguiente escenario de Fase 3 con revision previa de compatibilidad de `action_space`

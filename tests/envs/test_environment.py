@@ -123,6 +123,16 @@ class EnvironmentSmokeTests(unittest.TestCase):
         )
         self.assertTrue(all("MOVE_FORWARD" in label for label in labels))
 
+    def test_take_cover_dodge_actions_only_include_lateral_movement(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("MOVE_LEFT", "MOVE_RIGHT"),
+            preset="take_cover_dodge",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 2)
+        self.assertEqual(readable_labels, ("MOVE_LEFT", "MOVE_RIGHT"))
+
     def test_basic_action_preset_matches_available_buttons(self) -> None:
         project_paths = build_project_paths()
         profile = get_training_profile("default")
@@ -147,6 +157,30 @@ class EnvironmentSmokeTests(unittest.TestCase):
         finally:
             env.close()
 
+    def test_basic_audio_action_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="basic_audio")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+            )
+        finally:
+            env.close()
+
+    def test_basic_notifications_action_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="basic_notifications")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
+            )
+        finally:
+            env.close()
+
     def test_health_gathering_navigation_preset_matches_available_buttons(self) -> None:
         project_paths = build_project_paths()
         profile = get_training_profile("default", scenario_name="health_gathering")
@@ -155,6 +189,27 @@ class EnvironmentSmokeTests(unittest.TestCase):
             self.assertEqual(
                 env.get_attr("action_labels")[0],
                 ("MOVE_FORWARD", "TURN_LEFT+MOVE_FORWARD", "TURN_RIGHT+MOVE_FORWARD"),
+            )
+        finally:
+            env.close()
+
+    def test_take_cover_dodge_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="take_cover")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(env.get_attr("action_labels")[0], ("MOVE_LEFT", "MOVE_RIGHT"))
+        finally:
+            env.close()
+
+    def test_defend_the_line_turn_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="defend_the_line")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
             )
         finally:
             env.close()

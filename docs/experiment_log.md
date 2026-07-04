@@ -293,3 +293,152 @@ Cada entrada debe incluir:
 - decision siguiente:
   - congelar `health_gathering` como referencia fuerte de Fase 2
   - abrir el siguiente escenario del curriculum
+
+### 2026-06-29
+
+- escenario: `take_cover`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se incorporo `take_cover` al catalogo local como siguiente escenario preparado
+  - se agregaron assets oficiales `.cfg` y `.wad`
+  - se agrego preset de acciones `take_cover_dodge`
+  - se agrego config de escenario y tests minimos del preset de evasion
+- comando ejecutado:
+  - integracion local en repo
+- resultado observado:
+  - `take_cover` ya existe en `configs/scenarios/` y `data/scenarios/`
+  - el preset esperado queda definido como `MOVE_LEFT` y `MOVE_RIGHT`
+  - el escenario queda listo para piloto inicial por transferencia o desde cero
+- decision siguiente:
+  - correr piloto inicial de `take_cover`
+  - validar `best_model.zip` y `final_model.zip` offline con `50` episodios
+
+### 2026-06-30
+
+- escenario: `take_cover`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo piloto inicial desde cero por incompatibilidad de action space con `health_gathering`
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `best_model.zip` como checkpoint oficial inicial del escenario
+- comando ejecutado:
+  - `make train-from-scratch SCENARIO=take_cover SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__take_cover__20260630T011932555138Z\checkpoints\final_model.zip --scenario take_cover --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__take_cover__20260630T011932555138Z\checkpoints\best_model.zip --scenario take_cover --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__take_cover__20260630T011932555138Z\checkpoints\best_model.zip --scenario take_cover --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__take_cover__20260630T011932555138Z`
+  - `best_model.zip` y `final_model.zip` quedaron equivalentes bajo evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 205.98`
+    - `std_reward = 45.54`
+    - `mean_episode_length = 205.98`
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__take_cover_promoted.zip`
+- decision siguiente:
+  - congelar `take_cover` como referencia inicial de Fase 2
+  - abrir siguiente escenario del curriculum
+
+### 2026-07-03
+
+- escenario: `take_cover`
+- fase entrenamiento: `Fase 2`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo un segundo tramo de entrenamiento reanudando desde checkpoint promovido del escenario
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `final_model.zip` mejorado como nuevo checkpoint oficial del escenario
+- comando ejecutado:
+  - `make train SCENARIO=take_cover RESUME=artifacts\checkpoints\doom_foundation_agent__take_cover_promoted.zip SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__take_cover__20260703T140745071243Z\checkpoints\final_model.zip --scenario take_cover --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__take_cover__20260703T140745071243Z\checkpoints\best_model.zip --scenario take_cover --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__take_cover__20260703T140745071243Z\checkpoints\final_model.zip --scenario take_cover --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__take_cover__20260703T140745071243Z`
+  - `final_model.zip` supero a `best_model.zip` y al checkpoint promovido anterior en evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 331.90`
+    - `std_reward = 178.23`
+    - `mean_episode_length = 331.90`
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__take_cover_promoted.zip`
+- decision siguiente:
+  - congelar `take_cover` como referencia pulida de Fase 2
+  - abrir siguiente escenario del curriculum
+
+### 2026-07-03
+
+- escenario: `defend_the_line`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se incorporo `defend_the_line` al catalogo local como siguiente escenario preparado
+  - se agregaron assets oficiales `.cfg` y `.wad`
+  - se agrego config de escenario y tests minimos con preset `turn_combat`
+- comando ejecutado:
+  - integracion local en repo
+- resultado observado:
+  - `defend_the_line` ya existe en `configs/scenarios/` y `data/scenarios/`
+  - el preset esperado queda definido como `ATTACK`, `TURN_LEFT+ATTACK` y `TURN_RIGHT+ATTACK`
+  - el escenario queda listo para piloto inicial por transferencia o desde cero
+- decision siguiente:
+  - correr piloto inicial de `defend_the_line`
+  - validar `best_model.zip` y `final_model.zip` offline con `50` episodios
+
+### 2026-07-03
+
+- escenario: `defend_the_line`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo piloto inicial por transferencia desde checkpoint promovido de `defend_the_center`
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `best_model.zip` como checkpoint oficial del escenario
+  - se cerro administrativamente validacion inicial de `defend_the_line`
+- comando ejecutado:
+  - `make train SCENARIO=defend_the_line RESUME=artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip ALLOW_SCENARIO_RESUME=1 SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_line__20260703T195759636148Z\checkpoints\best_model.zip --scenario defend_the_line --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_line__20260703T195759636148Z\checkpoints\final_model.zip --scenario defend_the_line --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__defend_the_line__20260703T195759636148Z\checkpoints\best_model.zip --scenario defend_the_line --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__defend_the_line__20260703T195759636148Z`
+  - `best_model.zip` supero claramente a `final_model.zip` en evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 25.96`
+    - `std_reward = 4.87`
+    - `mean_episode_length = 939.30`
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_line_promoted.zip`
+  - transferencia valida desde `defend_the_center` por compatibilidad de action space `Discrete(3)`
+- decision siguiente:
+  - congelar `defend_the_line` como referencia inicial de Fase 3
+  - preparar siguiente escenario especializado con verificacion previa de compatibilidad de `action_space`
+
+### 2026-07-03
+
+- escenario: `defend_the_line`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se completo un tramo adicional de mejora reanudando desde checkpoint promovido del escenario
+  - se reevaluaron `best_model.zip` y `final_model.zip` con protocolo offline de `50` episodios
+  - se promovio `best_model.zip` mejorado como nuevo checkpoint oficial del escenario
+- comando ejecutado:
+  - `make train SCENARIO=defend_the_line RESUME=artifacts\checkpoints\doom_foundation_agent__defend_the_line_promoted.zip SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_line__20260703T231100240178Z\checkpoints\best_model.zip --scenario defend_the_line --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__defend_the_line__20260703T231100240178Z\checkpoints\final_model.zip --scenario defend_the_line --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__defend_the_line__20260703T231100240178Z\checkpoints\best_model.zip --scenario defend_the_line --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__defend_the_line__20260703T231100240178Z`
+  - `best_model.zip` supero al checkpoint promovido anterior y a `final_model.zip` en evaluacion offline de `50` episodios
+  - metricas oficiales del checkpoint promovido:
+    - `mean_reward = 27.06`
+    - `std_reward = 7.43`
+    - `mean_episode_length = 1026.78`
+  - checkpoint promovido oficial:
+    - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_line_promoted.zip`
+- decision siguiente:
+  - congelar `defend_the_line` como referencia oficial mejorada de Fase 3
+  - abrir `basic_audio` como siguiente escenario exacto
