@@ -162,6 +162,16 @@ class EnvironmentSmokeTests(unittest.TestCase):
         profile = get_training_profile("default", scenario_name="basic_audio")
         env = make_vectorized_env(profile, project_paths)
         try:
+            observation = cast(np.ndarray, env.reset())
+            self.assertEqual(
+                observation.shape,
+                (
+                    1,
+                    profile.stacked_observation_channels,
+                    profile.screen_height,
+                    profile.screen_width,
+                ),
+            )
             self.assertEqual(
                 env.get_attr("action_labels")[0],
                 ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
@@ -174,6 +184,16 @@ class EnvironmentSmokeTests(unittest.TestCase):
         profile = get_training_profile("default", scenario_name="basic_notifications")
         env = make_vectorized_env(profile, project_paths)
         try:
+            observation = cast(np.ndarray, env.reset())
+            self.assertEqual(
+                observation.shape,
+                (
+                    1,
+                    profile.stacked_observation_channels,
+                    profile.screen_height,
+                    profile.screen_width,
+                ),
+            )
             self.assertEqual(
                 env.get_attr("action_labels")[0],
                 ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),

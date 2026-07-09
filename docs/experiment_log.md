@@ -442,3 +442,99 @@ Cada entrada debe incluir:
 - decision siguiente:
   - congelar `defend_the_line` como referencia oficial mejorada de Fase 3
   - abrir `basic_audio` como siguiente escenario exacto
+
+### 2026-07-07
+
+- escenario: `basic_audio`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se integro soporte de observacion especializada para `audio_buffer`
+  - se agrego `observation_mode = vision_audio`
+  - se valido compatibilidad de perfiles, resume y tests
+- comando ejecutado:
+  - `make check`
+  - tests y typecheck locales
+- resultado observado:
+  - `basic_audio` deja de comportarse como `basic` normal
+  - el escenario ya usa entrada especializada real
+- decision siguiente:
+  - correr `basic_audio` desde cero
+
+### 2026-07-08
+
+- escenario: `basic_audio`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se corrio primer tramo desde cero para validar escenario especializado
+  - se reevaluaron `best_model.zip` y `final_model.zip` con `50` episodios
+  - se promovio `best_model.zip` de forma provisional
+- comando ejecutado:
+  - `make train-from-scratch SCENARIO=basic_audio SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__basic_audio__20260708T021922363894Z\checkpoints\best_model.zip --scenario basic_audio --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__basic_audio__20260708T021922363894Z\checkpoints\final_model.zip --scenario basic_audio --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__basic_audio__20260708T021922363894Z\checkpoints\best_model.zip --scenario basic_audio --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__basic_audio__20260708T021922363894Z`
+  - `best_model.zip` y `final_model.zip` quedaron equivalentes offline
+  - metricas provisionales:
+    - `mean_reward = -73.04`
+    - `std_reward = 120.88`
+    - `mean_episode_length = 74.60`
+- decision siguiente:
+  - probar un segundo tramo para ver si se consolida mejora real
+
+### 2026-07-09
+
+- escenario: `basic_audio`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se corrio un segundo tramo reanudando desde checkpoint promovido provisional
+  - se compararon `best_model.zip` y `final_model.zip` con `50` episodios
+  - se promovio un nuevo `best_model.zip` mejorado
+- comando ejecutado:
+  - `make train SCENARIO=basic_audio RESUME=artifacts\checkpoints\doom_foundation_agent__basic_audio_promoted.zip SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__basic_audio__20260709T002815511667Z\checkpoints\final_model.zip --scenario basic_audio --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__basic_audio__20260709T002815511667Z\checkpoints\best_model.zip --scenario basic_audio --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__basic_audio__20260709T002815511667Z\checkpoints\best_model.zip --scenario basic_audio --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__basic_audio__20260709T002815511667Z`
+  - `best_model.zip` supero al promovido provisional anterior
+  - metricas promovidas vigentes:
+    - `mean_reward = -64.84`
+    - `std_reward = 111.19`
+    - `mean_episode_length = 66.48`
+  - el escenario mejora, pero queda con varianza alta y sin consolidacion fuerte
+- decision siguiente:
+  - cerrar `basic_audio` como referencia provisional
+  - abrir `basic_notifications`
+
+### 2026-07-09
+
+- escenario: `basic_notifications`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se integro soporte de observacion especializada para `notifications_buffer`
+  - se agrego `observation_mode = vision_notifications`
+  - se corrio primer tramo desde cero
+  - se compararon `best_model.zip` y `final_model.zip` offline
+  - se promovio `best_model.zip` como referencia provisional
+- comando ejecutado:
+  - `make train-from-scratch SCENARIO=basic_notifications SEED=42 TIMESTEPS=300000`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__basic_notifications__20260709T024948566839Z\checkpoints\final_model.zip --scenario basic_notifications --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py evaluate --checkpoint artifacts\runs\doom_foundation_agent__basic_notifications__20260709T024948566839Z\checkpoints\best_model.zip --scenario basic_notifications --episodes 50 --no-render --json`
+  - `.\.venv\Scripts\python.exe src\cli.py promote-checkpoint --checkpoint artifacts\runs\doom_foundation_agent__basic_notifications__20260709T024948566839Z\checkpoints\best_model.zip --scenario basic_notifications --episodes 50`
+- resultado observado:
+  - corrida validada: `doom_foundation_agent__basic_notifications__20260709T024948566839Z`
+  - `best_model.zip` supero con claridad a `final_model.zip`
+  - metricas promovidas vigentes:
+    - `mean_reward = -73.60`
+    - `std_reward = 120.65`
+    - `mean_episode_length = 75.16`
+  - el escenario aprende algo, pero queda sesgado e inestable
+- decision siguiente:
+  - cerrar `basic_notifications` como referencia provisional
+  - dejar `my_way_home` como siguiente escenario exacto del roadmap

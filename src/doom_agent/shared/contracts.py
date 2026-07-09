@@ -44,6 +44,7 @@ class TrainingProfilePayload(TypedDict, total=False):
     frame_stack: int
     screen_width: int
     screen_height: int
+    observation_mode: str
     seed: int
     action_space_kind: str
     action_combo_preset: str
@@ -274,6 +275,7 @@ class LegacyConfigPayload(TypedDict, total=False):
     frame_stack: int
     screen_width: int
     screen_height: int
+    observation_mode: str
     seed: int
     scenario_key: str
     scenario_description: str

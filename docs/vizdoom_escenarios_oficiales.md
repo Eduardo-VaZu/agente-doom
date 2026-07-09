@@ -46,23 +46,23 @@ Segun el catalogo actual:
 - [configs/base.toml](/E:/agente-doom/configs/base.toml)
 - [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml)
 
-Escenario activo hoy:
+Escenarios ya integrados en el catalogo local:
 
 - `basic`
-
-Escenarios oficiales todavia no activos en el catalogo:
-
 - `basic_audio`
 - `basic_notifications`
-- `deadly_corridor`
-- `deathmatch`
 - `defend_the_center`
 - `defend_the_line`
 - `health_gathering`
+- `take_cover`
+
+Escenarios oficiales todavia no integrados en el catalogo local:
+
+- `deadly_corridor`
+- `deathmatch`
 - `health_gathering_supreme`
 - `my_way_home`
 - `predict_position`
-- `take_cover`
 
 ## Tabla de escenarios
 
@@ -95,8 +95,8 @@ Si quieres cubrir el set oficial con progresion razonable:
 2. `defend_the_center`
 3. `health_gathering`
 4. `take_cover`
-5. `basic_audio`
-6. `defend_the_line`
+5. `defend_the_line`
+6. `basic_audio`
 7. `basic_notifications`
 8. `my_way_home`
 9. `predict_position`

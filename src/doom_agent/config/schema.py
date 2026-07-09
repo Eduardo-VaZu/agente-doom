@@ -154,6 +154,7 @@ class TrainingProfile:
     frame_stack: int = 4
     screen_width: int = 84
     screen_height: int = 84
+    observation_mode: str = "vision"
     seed: int = 42
     action_space_kind: str = "multidiscrete"
     action_combo_preset: str = "default"
@@ -170,6 +171,18 @@ class TrainingProfile:
     @property
     def uses_rounded_timesteps(self) -> bool:
         return self.effective_timesteps != self.requested_timesteps
+
+    @property
+    def observation_channels(self) -> int:
+        if self.observation_mode == "vision":
+            return 1
+        if self.observation_mode in {"vision_audio", "vision_notifications"}:
+            return 2
+        raise ValueError(f"Modo de observacion no soportado: {self.observation_mode}")
+
+    @property
+    def stacked_observation_channels(self) -> int:
+        return self.observation_channels * self.frame_stack
 
     def with_timesteps(self, requested_timesteps: int) -> TrainingProfile:
         return replace(self, requested_timesteps=requested_timesteps)
@@ -230,6 +243,11 @@ class TrainingProfile:
                 "'action_space_kind' debe ser 'button_combinations', 'discrete' o 'multidiscrete'."
             )
 
+        if self.observation_mode not in {"vision", "vision_audio", "vision_notifications"}:
+            raise ValueError(
+                "'observation_mode' debe ser 'vision', 'vision_audio' o 'vision_notifications'."
+            )
+
         if self.action_combo_preset not in {
             "basic_combat",
             "default",
@@ -277,6 +295,7 @@ class TrainingProfile:
             "frame_stack": self.frame_stack,
             "screen_width": self.screen_width,
             "screen_height": self.screen_height,
+            "observation_mode": self.observation_mode,
             "seed": self.seed,
             "action_space_kind": self.action_space_kind,
             "action_combo_preset": self.action_combo_preset,
@@ -303,6 +322,7 @@ class TrainingProfile:
             "frame_stack": self.frame_stack,
             "screen_width": self.screen_width,
             "screen_height": self.screen_height,
+            "observation_mode": self.observation_mode,
             "seed": self.seed,
             "action_space_kind": self.action_space_kind,
             "action_combo_preset": self.action_combo_preset,
@@ -314,6 +334,7 @@ class TrainingProfile:
             "frame_stack": self.frame_stack,
             "screen_width": self.screen_width,
             "screen_height": self.screen_height,
+            "observation_mode": self.observation_mode,
             "action_space_kind": self.action_space_kind,
         }
 
@@ -370,6 +391,7 @@ class TrainingProfile:
             frame_stack=payload.get("frame_stack", 4),
             screen_width=payload.get("screen_width", 84),
             screen_height=payload.get("screen_height", 84),
+            observation_mode=payload.get("observation_mode", "vision"),
             seed=payload.get("seed", 42),
             action_space_kind=payload.get("action_space_kind", "multidiscrete"),
             action_combo_preset=payload.get("action_combo_preset", "default"),

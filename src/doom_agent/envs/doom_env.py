@@ -45,6 +45,54 @@ def preprocess_frame(frame: np.ndarray, width: int, height: int) -> Observation:
     return resized.reshape(1, height, width).astype(np.uint8)
 
 
+def preprocess_aux_buffer(
+    buffer: object,
+    width: int,
+    height: int,
+) -> Observation:
+    if buffer is None:
+        return np.zeros((1, height, width), dtype=np.uint8)
+
+    array = np.asarray(buffer)
+    if array.size == 0:
+        return np.zeros((1, height, width), dtype=np.uint8)
+
+    if array.dtype.kind in {"U", "S", "O"}:
+        flattened = np.asarray(buffer, dtype=object).reshape(-1)
+        text = " ".join(
+            value
+            for value in (str(item).strip() for item in flattened)
+            if value and value.lower() != "none"
+        )
+        if not text:
+            return np.zeros((1, height, width), dtype=np.uint8)
+        array = np.frombuffer(text.encode("utf-8", errors="ignore"), dtype=np.uint8)
+
+    array = np.squeeze(array)
+    if array.ndim == 0:
+        array = array.reshape(1, 1)
+    elif array.ndim == 1:
+        array = array.reshape(1, -1)
+    elif array.ndim > 2:
+        array = array.reshape(array.shape[0], -1)
+
+    if array.dtype != np.uint8:
+        normalized = array.astype(np.float32)
+        minimum = float(np.min(normalized))
+        maximum = float(np.max(normalized))
+        if maximum > minimum:
+            normalized = (normalized - minimum) / (maximum - minimum)
+            normalized *= 255.0
+        else:
+            normalized = np.zeros_like(normalized)
+        array = normalized.astype(np.uint8)
+    else:
+        array = array.copy()
+
+    resized = cv2.resize(array, (width, height), interpolation=cv2.INTER_AREA)
+    return resized.reshape(1, height, width).astype(np.uint8)
+
+
 def button_name(button: object) -> str:
     name = getattr(button, "name", None)
     if isinstance(name, str):
@@ -131,6 +179,7 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         game: zd.DoomGame,
         observation_width: int,
         observation_height: int,
+        observation_mode: str,
         action_space_kind: str,
         action_combo_preset: str,
         render_mode: str,
@@ -140,6 +189,7 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         self.game = game
         self.observation_width = observation_width
         self.observation_height = observation_height
+        self.observation_mode = observation_mode
         self.button_count = self.game.get_available_buttons_size()
         self.action_space_kind = action_space_kind
         self.action_combo_preset = action_combo_preset
@@ -169,7 +219,11 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         self.observation_space = gym.spaces.Box(
             low=0,
             high=255,
-            shape=(1, self.observation_height, self.observation_width),
+            shape=(
+                profile_observation_channels(self.observation_mode),
+                self.observation_height,
+                self.observation_width,
+            ),
             dtype=np.uint8,
         )
 
@@ -240,11 +294,46 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         if state is None:
             shape = cast(tuple[int, int, int], self.observation_space.shape)
             return np.zeros(shape, dtype=np.uint8)
-        return preprocess_frame(
-            state.screen_buffer,
-            width=self.observation_width,
-            height=self.observation_height,
-        )
+        channels = [
+            preprocess_frame(
+                state.screen_buffer,
+                width=self.observation_width,
+                height=self.observation_height,
+            )
+        ]
+        if self.observation_mode == "vision_audio":
+            channels.append(
+                preprocess_aux_buffer(
+                    observation_aux_buffer(state, self.observation_mode),
+                    width=self.observation_width,
+                    height=self.observation_height,
+                )
+            )
+        elif self.observation_mode == "vision_notifications":
+            channels.append(
+                preprocess_aux_buffer(
+                    observation_aux_buffer(state, self.observation_mode),
+                    width=self.observation_width,
+                    height=self.observation_height,
+                )
+            )
+        return np.concatenate(channels, axis=0)
+
+
+def profile_observation_channels(observation_mode: str) -> int:
+    if observation_mode == "vision":
+        return 1
+    if observation_mode in {"vision_audio", "vision_notifications"}:
+        return 2
+    raise ValueError(f"Modo de observacion no soportado: {observation_mode}")
+
+
+def observation_aux_buffer(state: zd.GameState, observation_mode: str) -> object:
+    if observation_mode == "vision_audio":
+        return getattr(state, "audio_buffer", None)
+    if observation_mode == "vision_notifications":
+        return getattr(state, "notifications_buffer", None)
+    return None
 
 
 def build_doom_game(profile: TrainingProfile, project_paths: ProjectPaths) -> zd.DoomGame:
@@ -275,6 +364,7 @@ def make_vectorized_env(
             game=game,
             observation_width=profile.screen_width,
             observation_height=profile.screen_height,
+            observation_mode=profile.observation_mode,
             action_space_kind=profile.action_space_kind,
             action_combo_preset=profile.action_combo_preset,
             render_mode="rgb_array",

@@ -37,6 +37,7 @@ def _legacy_config_to_profile(config: LegacyConfigPayload) -> TrainingProfile:
         "frame_stack": config.get("frame_stack", 4),
         "screen_width": config.get("screen_width", 84),
         "screen_height": config.get("screen_height", 84),
+        "observation_mode": config.get("observation_mode", "vision"),
         "seed": config.get("seed", 42),
         "action_combo_preset": config.get("action_combo_preset", "default"),
         "scenario_key": config.get("scenario_key", "basic"),

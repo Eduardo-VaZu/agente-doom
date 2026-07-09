@@ -1,36 +1,66 @@
 # Estado actual
 
-Documento consolidado del estado vivo del repo y del checkpoint de implementacion.
+Documento consolidado del estado vivo del repo.
 
-Sirve para responder dos preguntas sin saltar entre varios archivos:
+Sirve para responder rapido:
 
 - en que estamos hoy
-- que ya existe realmente en codigo y operacion
+- que escenarios ya quedaron cerrados
+- que escenarios quedaron provisionales
+- cual es el siguiente escenario exacto
 
-Fecha base: 2026-07-03
+Fecha base: 2026-07-09
 
 ## Resumen ejecutivo
 
 - modelo actual: `foundation`
 - fase actual de entrenamiento: `Fase 3`
 - fase actual de storage: `Fase 2`
-- escenario baseline oficial: `basic`
-- escenario activo oficial: `defend_the_line`
+- baseline oficial: `basic`
+- ultimo escenario cerrado fuerte: `defend_the_line`
+- ultimos escenarios especializados cerrados: `basic_audio`, `basic_notifications`
+- escenario siguiente exacto recomendado: `my_way_home`
+- estado operativo actual: no hay entrenamiento principal corriendo; toca preparar siguiente integracion
 - configuracion baseline: [configs/base.toml](/E:/agente-doom/configs/base.toml:1) + [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml:1)
-- configuracion activa: [configs/scenarios/defend_the_line.toml](/E:/agente-doom/configs/scenarios/defend_the_line.toml:1)
-- siguiente escenario sugerido: `basic_audio` como siguiente integracion de Fase 3
 - flujo principal: `make train`
-- flujo recomendado inicial: `make train-from-scratch`
+- flujo recomendado para escenario nuevo: `make train-from-scratch`
 - metadata remota activa: `Neon / PostgreSQL`
 - object storage remoto activo: `AWS S3`
 - handoff remoto activo: `hydrate-workspace` + `workspace_state.json`
 
 ## Foco actual
 
-- consolidar flujo oficial de entrenamiento, promotion y handoff multi-PC
-- dejar storage remoto mas legible para el equipo entre varias corridas
-- terminar de alinear documentacion con `manifest`, `promoted` y `hydrate`
-- cerrar administrativamente `defend_the_line` y preparar apertura del siguiente escenario del curriculum especializado
+- dejar documentado cierre real de `basic_audio` y `basic_notifications`
+- congelar por ahora escenarios ya entrenados
+- preparar integracion del siguiente escenario del curriculum: `my_way_home`
+- mantener el flujo de handoff multi-PC legible para otra IA o para otra PC del equipo
+
+## Estado de escenarios
+
+| Escenario | Estado actual | Calidad operativa | Checkpoint oficial | Resultado resumido | Nota |
+|---|---|---|---|---|---|
+| `basic` | Cerrado oficial | Bueno | `doom_foundation_agent_promoted.zip` | `mean_reward = -11.84`, `std = 11.26` | Baseline fuerte del proyecto. |
+| `defend_the_center` | Cerrado oficial | Bueno | `doom_foundation_agent__defend_the_center_promoted.zip` | `mean_reward = 9.90`, `std = 1.38` | Referencia fuerte de Fase 2. |
+| `health_gathering` | Cerrado oficial | Bueno | `doom_foundation_agent__health_gathering_promoted.zip` | `mean_reward = 1580.28`, `std = 736.36` | Muy buen resultado para supervivencia. |
+| `take_cover` | Cerrado oficial | Bueno | `doom_foundation_agent__take_cover_promoted.zip` | `mean_reward = 331.90`, `std = 178.23` | Referencia pulida de evasion. |
+| `defend_the_line` | Cerrado oficial | Bueno | `doom_foundation_agent__defend_the_line_promoted.zip` | `mean_reward = 27.06`, `std = 7.43` | Mejor cierre actual de Fase 3 estable. |
+| `basic_audio` | Cerrado provisional | Regular | `doom_foundation_agent__basic_audio_promoted.zip` | `mean_reward = -64.84`, `std = 111.19` | Mejorado respecto al primer intento, pero aun inestable. |
+| `basic_notifications` | Cerrado provisional | Regular | `doom_foundation_agent__basic_notifications_promoted.zip` | `mean_reward = -73.60`, `std = 120.65` | Aprendio algo, pero sigue sesgado e inestable. |
+| `my_way_home` | Siguiente escenario | Pendiente | No aplica | No entrenado aun | Siguiente candidato exacto. |
+| `predict_position` | Futuro | Pendiente | No aplica | No entrenado aun | Conviene despues de `my_way_home`. |
+| `health_gathering_supreme` | Futuro | Pendiente | No aplica | No entrenado aun | Version dura de navegacion/supervivencia. |
+| `deadly_corridor` | Futuro | Pendiente | No aplica | No entrenado aun | Alta dificultad. |
+| `deathmatch` | Futuro | Pendiente | No aplica | No entrenado aun | Dejar al final. |
+
+## Lectura operativa
+
+- `basic`, `defend_the_center`, `health_gathering`, `take_cover` y `defend_the_line` quedaron como referencias oficiales fuertes.
+- `basic_audio` y `basic_notifications` ya quedaron integrados y promovidos, pero solo como referencias provisionales.
+- no conviene gastar mas ciclos ahora en `basic_audio` y `basic_notifications` con la misma configuracion.
+- para presentacion o continuidad del proyecto, la narrativa correcta es:
+  - baseline fuerte en `basic`
+  - expansion fuerte en Fase 2
+  - Fase 3 ya probo escenario frontal estable y dos escenarios sensoriales especializados
 
 ## Ya implementado
 
@@ -39,7 +69,11 @@ Fecha base: 2026-07-03
 - se usa:
   - [configs/base.toml](/E:/agente-doom/configs/base.toml:1)
   - [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml:1)
-- la arquitectura permite agregar escenarios por archivo TOML
+- arquitectura por escenario en `configs/scenarios/*.toml`
+- modos de observacion especializados ya integrados:
+  - `vision`
+  - `vision_audio`
+  - `vision_notifications`
 
 ### CLI publica
 
@@ -86,82 +120,34 @@ Comandos principales disponibles:
 - `make sync-dry-run RUN_ID=<run_id>`
 - `make tensorboard`
 
-### Observabilidad
+### Storage y handoff
 
-- TensorBoard operativo por corrida
-- consola de entrenamiento mejorada con bloques visuales
-- resumenes visuales para inicio, reward shaping, resume, evaluacion, best model, checkpoint, acciones recientes y resultado final
-- `inspect-run` para consolidar `report.json` + `manifest.json`
-
-### Storage y persistencia remota
-
-- schema inicial de `PostgreSQL` con:
-  - `training_runs`
-  - `run_artifacts`
-  - `sync_events`
+- schema remoto operativo en `PostgreSQL`
 - persistencia de corridas en `Neon`
-- lectura de `list-runs` desde `PostgreSQL` con fallback a JSON local
-- sync remoto de `report.json`, `manifest.json`, checkpoints finales, best seleccionados y videos a `AWS S3`
-- resincronizacion manual con `sync-artifacts` para corridas `local_only` o `failed`
-- backend remoto unico: `AWS S3`
-- `manifest.json` como inventario estructurado por corrida
-
-### Handoff multi-PC
-
-- `workspace_state.json` publica punteros compartidos `active` y `promoted`
-- `promote-checkpoint` fija checkpoint oficial validado offline
-- `hydrate-workspace` reconstruye `active` y `promoted` en otra PC
-- flujo oficial: `single active training`, una sola PC entrena la linea principal a la vez
-
-### Estado empirico reciente
-
-- baseline larga de `basic` ya cerrada como referencia oficial
-- checkpoint promovido disponible para continuidad y transferencia
-- `defend_the_center` ya incorporado al catalogo local con config propia
-- validacion inicial de `defend_the_center` completada por transferencia desde `basic`
-- corrida inicial validada: `doom_foundation_agent__defend_the_center__20260623T025602580980Z`
-- corrida de mejora validada: `doom_foundation_agent__defend_the_center__20260625T025825622091Z`
-- `health_gathering` ya incorporado al catalogo local con config propia
-- piloto inicial validado: `doom_foundation_agent__health_gathering__20260625T113629214351Z`
-- corrida de mejora validada: `doom_foundation_agent__health_gathering__20260626T014540629370Z`
-- `take_cover` ya incorporado al catalogo local con config propia
-- piloto inicial validado: `doom_foundation_agent__take_cover__20260630T011932555138Z`
-- corrida de mejora validada: `doom_foundation_agent__take_cover__20260703T140745071243Z`
-- `defend_the_line` ya incorporado al catalogo local con config propia
-- checkpoint oficial promovido de `defend_the_center`:
-  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_center_promoted.zip`
-- metricas oficiales offline de `50` episodios para `best_model.zip` promovido:
-  - `mean_reward = 9.90`
-  - `std_reward = 1.38`
-  - `mean_episode_length = 634.12`
-- checkpoint oficial promovido de `health_gathering`:
-  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip`
-- metricas oficiales offline de `50` episodios para `best_model.zip` promovido:
-  - `mean_reward = 1580.28`
-  - `std_reward = 736.36`
-  - `mean_episode_length = 1581.04`
-- checkpoint oficial promovido de `take_cover`:
-  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__take_cover_promoted.zip`
-- metricas oficiales offline de `50` episodios para checkpoint promovido:
-  - `mean_reward = 331.90`
-  - `std_reward = 178.23`
-  - `mean_episode_length = 331.90`
-- corridas validadas de `defend_the_line`:
-  - `doom_foundation_agent__defend_the_line__20260703T195759636148Z`
-  - `doom_foundation_agent__defend_the_line__20260703T231100240178Z`
-- checkpoint oficial promovido de `defend_the_line`:
-  - `E:\agente-doom\artifacts\checkpoints\doom_foundation_agent__defend_the_line_promoted.zip`
-- metricas oficiales offline de `50` episodios para `best_model.zip` promovido:
-  - `mean_reward = 27.06`
-  - `std_reward = 7.43`
-  - `mean_episode_length = 1026.78`
-- auto-checkpoints sirven como soporte local, no como fuente oficial de verdad para handoff
+- sync remoto de `report.json`, `manifest.json`, checkpoints elegibles y videos a `AWS S3`
+- `workspace_state.json` publica punteros `active` y `promoted`
+- `hydrate-workspace` reconstruye continuidad en otra PC
+- flujo oficial: una sola PC entrena linea principal a la vez
 
 ## Bloqueos o riesgos actuales
 
-- falta definir politica operativa simple de limpieza y retencion de artefactos
-- auto-checkpoints siguen fuera del handoff oficial
-- falta preparar formalmente el siguiente escenario de Fase 3 con config y protocolo inicial
+- falta integrar `my_way_home` al catalogo local con `.cfg`, `.wad`, TOML y tests minimos
+- escenarios sensoriales quedaron usables, pero no fuertes
+- auto-checkpoints siguen siendo apoyo local, no fuente oficial de verdad
+
+## Politica recomendada para reentrenar escenarios pasados
+
+Si, se pueden volver a entrenar escenarios ya cerrados, pero no todos merecen eso ahora.
+
+Regla sugerida:
+
+- reentrenar un escenario fuerte solo si hace falta para una demo puntual o una comparacion formal
+- reabrir un escenario provisional si cambia la observacion, reward, arquitectura o si aparece una configuracion mejor claramente justificada
+- no reabrir `basic_audio` ni `basic_notifications` ahora con la misma config; el retorno esperado es bajo
+- si se reabre algo en el futuro:
+  - usar nueva corrida
+  - reevaluar offline con `50` episodios
+  - promover solo si supera checkpoint oficial vigente
 
 ## Operacion recomendada hoy
 
@@ -177,9 +163,8 @@ Comandos principales disponibles:
 
 ## Siguiente accion recomendada
 
-1. usar `make inspect-run RUN_ID=...` para revisar la corrida principal
-2. usar `make evaluate CHECKPOINT=... EPISODES=50 NO_RENDER=1 JSON=1` para comparaciones oficiales
-3. usar `make promote CHECKPOINT=... PROMOTE_EPISODES=50` cuando un checkpoint merezca quedar como referencia
-4. usar `make hydrate ONLY=promoted` en otra PC si hace falta continuidad
-5. registrar resultado en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
-6. preparar siguiente escenario de Fase 3 con revision previa de compatibilidad de `action_space`
+1. registrar cierre de escenarios sensoriales en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
+2. mantener congelados checkpoints oficiales actuales
+3. preparar `my_way_home` como siguiente escenario exacto
+4. agregar config, assets y tests minimos de `my_way_home`
+5. correr piloto inicial desde cero o por transferencia solo si action space y observacion son compatibles

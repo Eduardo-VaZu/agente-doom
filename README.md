@@ -2,7 +2,7 @@
 
 Proyecto de entrenamiento en ViZDoom con `Stable-Baselines3` y `RecurrentPPO`.
 
-Hoy el repo entrena el modelo `foundation` sobre el escenario `basic`, usando `make`
+Hoy el repo entrena el modelo `foundation` por escenario, usando `make`
 como punto principal de operacion. La persistencia remota activa usa `Neon` para metadata
 y `AWS S3` para artefactos pesados.
 
@@ -249,8 +249,11 @@ considera `report.json`, `manifest.json`, checkpoints y videos elegibles.
 ## Estado actual
 
 - modelo activo: `foundation`
-- escenario activo: `basic`
-- fase entrenamiento: `Fase 1`
+- baseline oficial: `basic`
+- ultimo escenario fuerte cerrado: `defend_the_line`
+- escenarios especializados cerrados: `basic_audio`, `basic_notifications`
+- siguiente escenario exacto recomendado: `my_way_home`
+- fase entrenamiento: `Fase 3`
 - fase storage: `Fase 2`
 - flujo principal: `make train`
 

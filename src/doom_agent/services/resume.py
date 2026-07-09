@@ -57,13 +57,13 @@ def _legacy_compatibility_issues(profile: TrainingProfile, checkpoint_stem: Path
     issues: list[str] = []
 
     if observation_shape != (
-        profile.frame_stack,
+        profile.stacked_observation_channels,
         profile.screen_height,
         profile.screen_width,
     ):
         issues.append(
             "La forma de observacion del checkpoint legacy "
-            f"{observation_shape} no coincide con {(profile.frame_stack, profile.screen_height, profile.screen_width)}."
+            f"{observation_shape} no coincide con {(profile.stacked_observation_channels, profile.screen_height, profile.screen_width)}."
         )
 
     checkpoint_action_space_kind = _action_space_kind(legacy_model.action_space)

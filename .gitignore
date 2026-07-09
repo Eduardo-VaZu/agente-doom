@@ -11,3 +11,6 @@ logs/
 data/videos/
 _vizdoom.ini
 .DS_Store
+tmp 
+outputs
+docs/assets/
