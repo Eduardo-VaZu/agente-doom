@@ -538,3 +538,22 @@ Cada entrada debe incluir:
 - decision siguiente:
   - cerrar `basic_notifications` como referencia provisional
   - dejar `my_way_home` como siguiente escenario exacto del roadmap
+
+### 2026-07-09
+
+- escenario: `my_way_home`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - se integraron assets oficiales `.cfg` y `.wad`
+  - se agrego config de escenario en `configs/scenarios/my_way_home.toml`
+  - se agregaron tests minimos de config y preset de navegacion
+- comando ejecutado:
+  - integracion local en repo
+- resultado observado:
+  - `my_way_home` ya existe en `configs/scenarios/` y `data/scenarios/`
+  - el escenario queda preparado para piloto inicial
+  - el preset actual usa `MOVE_FORWARD`, `TURN_LEFT`, `TURN_RIGHT`, `MOVE_LEFT` y `MOVE_RIGHT`
+- decision siguiente:
+  - correr `make check`
+  - decidir si `my_way_home` arranca desde cero o por transferencia

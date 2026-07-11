@@ -54,6 +54,7 @@ Escenarios ya integrados en el catalogo local:
 - `defend_the_center`
 - `defend_the_line`
 - `health_gathering`
+- `my_way_home`
 - `take_cover`
 
 Escenarios oficiales todavia no integrados en el catalogo local:
@@ -61,7 +62,6 @@ Escenarios oficiales todavia no integrados en el catalogo local:
 - `deadly_corridor`
 - `deathmatch`
 - `health_gathering_supreme`
-- `my_way_home`
 - `predict_position`
 
 ## Tabla de escenarios
@@ -83,7 +83,7 @@ Notas:
 | `defend_the_line` | `defend_the_line.cfg` | Defender una linea frontal contra monstruos. | Girar izquierda, girar derecha, disparar. | 3 | Media-alta |
 | `health_gathering` | `health_gathering.cfg` | Sobrevivir recogiendo botiquines en piso acido. | Girar izquierda, girar derecha, avanzar. | No especificado | Media |
 | `health_gathering_supreme` | `health_gathering_supreme.cfg` | Igual que `health_gathering`, con layout mas complejo. | Girar izquierda, girar derecha, avanzar. | No especificado | Alta |
-| `my_way_home` | `my_way_home.cfg` | Navegar laberinto y encontrar chaleco verde objetivo. | Girar izquierda, girar derecha, avanzar. | No especificado | Alta |
+| `my_way_home` | `my_way_home.cfg` | Navegar laberinto y encontrar chaleco verde objetivo. | Girar izquierda, girar derecha, avanzar, moverse a izquierda y derecha. | 5 | Alta |
 | `predict_position` | `predict_position.cfg` | Sincronizar disparo de cohete para interceptar objetivo movil. | Girar izquierda, girar derecha, disparar. | No especificado | Alta |
 | `take_cover` | `take_cover.cfg` | Esquivar proyectiles y sobrevivir el mayor tiempo posible. | Mover izquierda, mover derecha. | 4 | Media |
 

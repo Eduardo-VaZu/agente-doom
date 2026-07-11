@@ -133,6 +133,19 @@ class EnvironmentSmokeTests(unittest.TestCase):
         self.assertEqual(len(actions), 2)
         self.assertEqual(readable_labels, ("MOVE_LEFT", "MOVE_RIGHT"))
 
+    def test_my_way_home_navigation_actions_cover_turns_and_strafes(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("TURN_LEFT", "TURN_RIGHT", "MOVE_FORWARD", "MOVE_LEFT", "MOVE_RIGHT"),
+            preset="my_way_home_navigation",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 5)
+        self.assertEqual(
+            readable_labels,
+            ("MOVE_FORWARD", "TURN_LEFT", "TURN_RIGHT", "MOVE_LEFT", "MOVE_RIGHT"),
+        )
+
     def test_basic_action_preset_matches_available_buttons(self) -> None:
         project_paths = build_project_paths()
         profile = get_training_profile("default")
@@ -219,6 +232,18 @@ class EnvironmentSmokeTests(unittest.TestCase):
         env = make_vectorized_env(profile, project_paths)
         try:
             self.assertEqual(env.get_attr("action_labels")[0], ("MOVE_LEFT", "MOVE_RIGHT"))
+        finally:
+            env.close()
+
+    def test_my_way_home_navigation_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="my_way_home")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("MOVE_FORWARD", "TURN_LEFT", "TURN_RIGHT", "MOVE_LEFT", "MOVE_RIGHT"),
+            )
         finally:
             env.close()
 

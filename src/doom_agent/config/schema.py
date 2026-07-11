@@ -252,12 +252,14 @@ class TrainingProfile:
             "basic_combat",
             "default",
             "health_navigation",
+            "my_way_home_navigation",
             "take_cover_dodge",
             "turn_combat",
         }:
             raise ValueError(
                 "'action_combo_preset' debe ser 'basic_combat', 'default', "
-                "'health_navigation', 'take_cover_dodge' o 'turn_combat'."
+                "'health_navigation', 'my_way_home_navigation', "
+                "'take_cover_dodge' o 'turn_combat'."
             )
 
         if not self.scenario_key:

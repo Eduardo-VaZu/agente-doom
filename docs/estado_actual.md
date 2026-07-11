@@ -46,7 +46,7 @@ Fecha base: 2026-07-09
 | `defend_the_line` | Cerrado oficial | Bueno | `doom_foundation_agent__defend_the_line_promoted.zip` | `mean_reward = 27.06`, `std = 7.43` | Mejor cierre actual de Fase 3 estable. |
 | `basic_audio` | Cerrado provisional | Regular | `doom_foundation_agent__basic_audio_promoted.zip` | `mean_reward = -64.84`, `std = 111.19` | Mejorado respecto al primer intento, pero aun inestable. |
 | `basic_notifications` | Cerrado provisional | Regular | `doom_foundation_agent__basic_notifications_promoted.zip` | `mean_reward = -73.60`, `std = 120.65` | Aprendio algo, pero sigue sesgado e inestable. |
-| `my_way_home` | Siguiente escenario | Pendiente | No aplica | No entrenado aun | Siguiente candidato exacto. |
+| `my_way_home` | Preparado para piloto | Pendiente | No aplica | No entrenado aun | Ya integrado en catalogo; falta primer train. |
 | `predict_position` | Futuro | Pendiente | No aplica | No entrenado aun | Conviene despues de `my_way_home`. |
 | `health_gathering_supreme` | Futuro | Pendiente | No aplica | No entrenado aun | Version dura de navegacion/supervivencia. |
 | `deadly_corridor` | Futuro | Pendiente | No aplica | No entrenado aun | Alta dificultad. |
@@ -131,7 +131,7 @@ Comandos principales disponibles:
 
 ## Bloqueos o riesgos actuales
 
-- falta integrar `my_way_home` al catalogo local con `.cfg`, `.wad`, TOML y tests minimos
+- falta correr el primer piloto real de `my_way_home`
 - escenarios sensoriales quedaron usables, pero no fuertes
 - auto-checkpoints siguen siendo apoyo local, no fuente oficial de verdad
 
@@ -149,6 +149,49 @@ Regla sugerida:
   - reevaluar offline con `50` episodios
   - promover solo si supera checkpoint oficial vigente
 
+## Post-curriculum
+
+Despues de terminar la integracion y entrenamiento del resto del curriculum, el orden recomendado para volver a escenarios ya entrenados es este:
+
+1. `basic_audio`
+2. `basic_notifications`
+3. `my_way_home`, solo si su primer piloto queda regular
+4. `defend_the_line`, solo si hace falta una version mas fuerte para demo o comparacion
+
+Escenarios que hoy no merecen reentrenamiento prioritario:
+
+- `basic`
+- `defend_the_center`
+- `health_gathering`
+- `take_cover`
+
+Esos ya estan lo bastante bien para quedar como referencias oficiales fuertes.
+
+Para que un escenario provisional pase a oficial fuerte, la regla sugerida es:
+
+- mejorar claramente su checkpoint promovido vigente en evaluacion offline de `50` episodios
+- bajar sesgo de acciones dominante si hoy esta muy cargado a un lado
+- mantener una varianza mas razonable que la actual
+- repetir el resultado en al menos un segundo tramo o una segunda corrida si el escenario sigue siendo inestable
+
+Escenarios con mayor margen real de mejora futura:
+
+- `basic_audio`
+  - motivo: ya mejoro entre primer y segundo tramo
+  - problema actual: alta varianza
+  - mejora candidata: `ent_coef` un poco mas alto, `n_epochs` un poco mas bajo, tramos mas cortos
+- `basic_notifications`
+  - motivo: aprende algo, pero conserva sesgo fuerte
+  - problema actual: colapso de politica hacia un lado
+  - mejora candidata: misma linea que `basic_audio`, con mas control de exploracion y cortes de entrenamiento mas tempranos
+
+En palabras simples:
+
+- si terminamos el curriculum, los dos primeros escenarios que vale la pena reabrir son `basic_audio` y `basic_notifications`
+- se pueden volver a entrenar con una nueva configuracion
+- lo ya promovido no se pierde
+- solo pasarian a oficiales fuertes si la nueva version supera claramente la actual
+
 ## Operacion recomendada hoy
 
 1. `make setup`
@@ -165,6 +208,6 @@ Regla sugerida:
 
 1. registrar cierre de escenarios sensoriales en [experiment_log.md](/E:/agente-doom/docs/experiment_log.md:1)
 2. mantener congelados checkpoints oficiales actuales
-3. preparar `my_way_home` como siguiente escenario exacto
-4. agregar config, assets y tests minimos de `my_way_home`
-5. correr piloto inicial desde cero o por transferencia solo si action space y observacion son compatibles
+3. revisar integracion de `my_way_home` con `make check`
+4. decidir si el piloto arranca desde cero o por transferencia
+5. correr piloto inicial de `my_way_home`

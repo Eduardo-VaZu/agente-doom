@@ -32,7 +32,7 @@ Solo se avanza a siguiente tramo cuando:
 | `defend_the_line` | Fase 3 | Cerrado oficial | [defend_the_line.toml](/E:/agente-doom/configs/scenarios/defend_the_line.toml:1) | Si | combate frontal sostenido | mejor cierre estable de Fase 3 hasta ahora |
 | `basic_audio` | Fase 3 | Cerrado provisional | [basic_audio.toml](/E:/agente-doom/configs/scenarios/basic_audio.toml:1) | Si | percepcion por audio | promovido, pero con varianza alta |
 | `basic_notifications` | Fase 3 | Cerrado provisional | [basic_notifications.toml](/E:/agente-doom/configs/scenarios/basic_notifications.toml:1) | Si | seleccion de objetivo por notificacion | promovido, pero con sesgo fuerte |
-| `my_way_home` | Fase 3 | Siguiente exacto | No creado aun | No | navegacion espacial | mejor siguiente paso del curriculum |
+| `my_way_home` | Fase 3 | Preparado para piloto | [my_way_home.toml](/E:/agente-doom/configs/scenarios/my_way_home.toml:1) | Si | navegacion espacial | siguiente escenario exacto ya integrado |
 | `predict_position` | Fase 3 | Pendiente | No creado aun | No | precision temporal | candidato despues de `my_way_home` |
 | `health_gathering_supreme` | Fase 3 | Pendiente | No creado aun | No | supervivencia compleja | version dura de `health_gathering` |
 | `deadly_corridor` | Fase 4 | Pendiente | No creado aun | No | integracion de combate y navegacion | muy alta dificultad |
@@ -108,7 +108,7 @@ Lectura:
 
 - `defend_the_line` ya no necesita mas trabajo ahora
 - `basic_audio` y `basic_notifications` se pueden reabrir en el futuro, pero hoy no son mejor uso del tiempo
-- siguiente avance sano del curriculum: `my_way_home`
+- siguiente avance sano del curriculum: correr primer piloto de `my_way_home`
 
 ## Fase 4
 
@@ -135,8 +135,29 @@ Estado:
 
 ### Siguiente
 
-1. integrar `my_way_home` en `configs/scenarios/` y `data/scenarios/`
-2. agregar tests minimos del preset de navegacion
-3. definir si arranca desde cero o por transferencia segun compatibilidad de action space
-4. correr piloto inicial de `300000` steps
-5. evaluar `best_model.zip` y `final_model.zip` offline con `50` episodios
+1. decidir si `my_way_home` arranca desde cero o por transferencia segun compatibilidad de action space
+2. correr piloto inicial de `300000` steps
+3. evaluar `best_model.zip` y `final_model.zip` offline con `50` episodios
+4. promover solo si resultado offline lo justifica
+
+## Post-curriculum
+
+Cuando termine el bloque actual de escenarios pendientes, el orden recomendado de reentrenamiento es:
+
+1. `basic_audio`
+2. `basic_notifications`
+3. `my_way_home`, solo si no cierra fuerte en su primer ciclo
+4. `defend_the_line`, solo si se necesita una version mas fuerte
+
+Objetivo de esas reaperturas:
+
+- convertir escenarios provisionales en referencias oficiales fuertes
+- probar una `v2` de configuracion sin tocar checkpoints ya promovidos
+- medir si la mejora viene de hyperparams o si ya hace falta cambiar representacion/arquitectura
+
+Criterio para considerar una `v2` exitosa:
+
+- supera checkpoint promovido vigente en evaluacion offline de `50` episodios
+- reduce sesgo de acciones dominante
+- no se degrada tanto entre `best_model.zip` y `final_model.zip`
+- deja una narrativa mas fuerte para presentacion y cierre del proyecto

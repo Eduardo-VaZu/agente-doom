@@ -49,6 +49,7 @@ class TrainingProfileTests(unittest.TestCase):
                 "defend_the_center",
                 "defend_the_line",
                 "health_gathering",
+                "my_way_home",
                 "take_cover",
             ),
         )
@@ -147,6 +148,15 @@ class TrainingProfileTests(unittest.TestCase):
         profile = get_training_profile("default", scenario_name="take_cover")
         self.assertEqual(profile.scenario_name, "take_cover.cfg")
         self.assertEqual(profile.action_combo_preset, "take_cover_dodge")
+        self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
+    def test_my_way_home_scenario_uses_navigation_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="my_way_home")
+        self.assertEqual(profile.scenario_name, "my_way_home.cfg")
+        self.assertEqual(profile.action_combo_preset, "my_way_home_navigation")
         self.assertEqual(profile.requested_timesteps, 300000)
         self.assertEqual(profile.eval_episodes, 20)
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)
