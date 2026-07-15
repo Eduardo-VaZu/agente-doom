@@ -5,6 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 from typing import cast
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
@@ -20,6 +21,7 @@ from doom_agent.utils.checkpoints import (
     build_checkpoint_metadata,
     checkpoint_metadata_path,
     checkpoint_zip_path,
+    copy_checkpoint_bundle,
     load_checkpoint_metadata,
     promoted_checkpoint_stem,
     resolve_checkpoint_preference,
@@ -85,6 +87,43 @@ class CheckpointTests(unittest.TestCase):
                 EvaluationMetricsPayload, loaded_metadata["evaluation_metrics"]
             )
             self.assertEqual(evaluation_metrics["mean_reward"], 12.5)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_copy_checkpoint_bundle_retries_on_transient_permission_error(self) -> None:
+        """Regresion: Windows Defender/Search Indexer pueden retener brevemente el zip
+        recien escrito, causando PermissionError [WinError 32]. copy_checkpoint_bundle
+        debe reintentar en vez de tumbar el entrenamiento completo."""
+        temp_dir = Path("artifacts") / "test-temp" / "checkpoint-bundle-retry"
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            profile = get_training_profile("default", requested_timesteps=8)
+            source_stem = temp_dir / "source"
+            target_stem = temp_dir / "target"
+            save_checkpoint_bundle(
+                DummyModel(),
+                source_stem,
+                build_checkpoint_metadata("default", profile, saved_timesteps=1000),
+            )
+
+            real_copy2 = shutil.copy2
+            call_count = {"n": 0}
+
+            def flaky_copy2(src: str, dst: str) -> str:
+                call_count["n"] += 1
+                if call_count["n"] == 1:
+                    raise PermissionError(
+                        "[WinError 32] El proceso no tiene acceso al archivo "
+                        "porque esta siendo utilizado por otro proceso"
+                    )
+                return real_copy2(src, dst)
+
+            with patch("doom_agent.utils.checkpoints.shutil.copy2", side_effect=flaky_copy2):
+                copy_checkpoint_bundle(source_stem, target_stem)
+
+            self.assertTrue(checkpoint_zip_path(target_stem).exists())
+            self.assertGreaterEqual(call_count["n"], 2)
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 

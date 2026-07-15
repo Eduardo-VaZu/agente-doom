@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -103,11 +104,22 @@ def save_checkpoint_bundle(
     write_json(checkpoint_metadata_path(checkpoint_stem), metadata)
 
 
+def _copy2_with_retry(source: Path, target: Path, attempts: int = 6, delay_seconds: float = 0.5) -> None:
+    for attempt in range(1, attempts + 1):
+        try:
+            shutil.copy2(source, target)
+            return
+        except PermissionError:
+            if attempt == attempts:
+                raise
+            time.sleep(delay_seconds * attempt)
+
+
 def copy_checkpoint_bundle(source_stem: Path, target_stem: Path) -> None:
-    shutil.copy2(checkpoint_zip_path(source_stem), checkpoint_zip_path(target_stem))
+    _copy2_with_retry(checkpoint_zip_path(source_stem), checkpoint_zip_path(target_stem))
     source_metadata_path = checkpoint_metadata_path(source_stem)
     if source_metadata_path.exists():
-        shutil.copy2(source_metadata_path, checkpoint_metadata_path(target_stem))
+        _copy2_with_retry(source_metadata_path, checkpoint_metadata_path(target_stem))
 
 
 def update_checkpoint_metadata(
