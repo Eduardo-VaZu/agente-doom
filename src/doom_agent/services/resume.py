@@ -50,20 +50,30 @@ def _action_space_kind(action_space: Any) -> str:
 
 
 def _legacy_compatibility_issues(profile: TrainingProfile, checkpoint_stem: Path) -> list[str]:
+    import gymnasium as gym
     from sb3_contrib import RecurrentPPO
 
     legacy_model = RecurrentPPO.load(str(checkpoint_zip_path(checkpoint_stem)))
-    observation_shape = legacy_model.observation_space.shape
+    legacy_observation_space = legacy_model.observation_space
     issues: list[str] = []
 
-    if observation_shape != (
-        profile.stacked_observation_channels,
-        profile.screen_height,
-        profile.screen_width,
-    ):
+    if isinstance(legacy_observation_space, gym.spaces.Box):
+        observation_shape = legacy_observation_space.shape
+        expected_shape = (
+            profile.stacked_observation_channels,
+            profile.screen_height,
+            profile.screen_width,
+        )
+        if observation_shape != expected_shape:
+            issues.append(
+                "La forma de observacion del checkpoint legacy "
+                f"{observation_shape} no coincide con {expected_shape}."
+            )
+    elif profile.observation_mode == "vision":
         issues.append(
-            "La forma de observacion del checkpoint legacy "
-            f"{observation_shape} no coincide con {(profile.stacked_observation_channels, profile.screen_height, profile.screen_width)}."
+            "El checkpoint legacy usa un espacio de observacion "
+            f"{type(legacy_observation_space).__name__} incompatible con el perfil actual "
+            "('vision', espacio Box plano)."
         )
 
     checkpoint_action_space_kind = _action_space_kind(legacy_model.action_space)

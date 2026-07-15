@@ -18,7 +18,7 @@ from stable_baselines3.common.vec_env import (
 
 from doom_agent.config.schema import ProjectPaths, TrainingProfile
 from doom_agent.envs.reward import RewardShaper
-from doom_agent.shared.types import AgentAction, BinaryAction, Observation
+from doom_agent.shared.types import AgentAction, BinaryAction, DictObservation, Observation
 from doom_agent.utils.filesystem import ensure_directories
 
 OPPOSING_BUTTON_PAIRS = frozenset(
@@ -45,52 +45,51 @@ def preprocess_frame(frame: np.ndarray, width: int, height: int) -> Observation:
     return resized.reshape(1, height, width).astype(np.uint8)
 
 
-def preprocess_aux_buffer(
-    buffer: object,
-    width: int,
-    height: int,
-) -> Observation:
-    if buffer is None:
-        return np.zeros((1, height, width), dtype=np.uint8)
+def extract_audio_features(audio_buffer: np.ndarray | None) -> np.ndarray:
+    """RMS por canal + panning + volumen a partir de PCM estereo crudo (int16, shape (N, 2))."""
+    if audio_buffer is None or np.asarray(audio_buffer).size == 0:
+        return np.zeros(4, dtype=np.float32)
 
-    array = np.asarray(buffer)
-    if array.size == 0:
-        return np.zeros((1, height, width), dtype=np.uint8)
+    samples = np.asarray(audio_buffer, dtype=np.float32).reshape(-1, 2) / 32768.0
+    left, right = samples[:, 0], samples[:, 1]
+    rms_left = float(np.sqrt(np.mean(np.square(left))))
+    rms_right = float(np.sqrt(np.mean(np.square(right))))
+    total = rms_left + rms_right
+    pan = (rms_left - rms_right) / total if total > 1e-6 else 0.0
+    loudness = total / 2.0
+    return np.array([rms_left, rms_right, pan, loudness], dtype=np.float32)
 
-    if array.dtype.kind in {"U", "S", "O"}:
-        flattened = np.asarray(buffer, dtype=object).reshape(-1)
-        text = " ".join(
-            value
-            for value in (str(item).strip() for item in flattened)
-            if value and value.lower() != "none"
-        )
-        if not text:
-            return np.zeros((1, height, width), dtype=np.uint8)
-        array = np.frombuffer(text.encode("utf-8", errors="ignore"), dtype=np.uint8)
 
-    array = np.squeeze(array)
-    if array.ndim == 0:
-        array = array.reshape(1, 1)
-    elif array.ndim == 1:
-        array = array.reshape(1, -1)
-    elif array.ndim > 2:
-        array = array.reshape(array.shape[0], -1)
+NOTIFICATION_VOCABULARY: tuple[str, ...] = ("", "Cacodemon", "Demon", "DoomImp")
 
-    if array.dtype != np.uint8:
-        normalized = array.astype(np.float32)
-        minimum = float(np.min(normalized))
-        maximum = float(np.max(normalized))
-        if maximum > minimum:
-            normalized = (normalized - minimum) / (maximum - minimum)
-            normalized *= 255.0
-        else:
-            normalized = np.zeros_like(normalized)
-        array = normalized.astype(np.uint8)
-    else:
-        array = array.copy()
 
-    resized = cv2.resize(array, (width, height), interpolation=cv2.INTER_AREA)
-    return resized.reshape(1, height, width).astype(np.uint8)
+def parse_notification_label(text: str | None) -> str:
+    if not text:
+        return ""
+    stripped = text.strip()
+    prefix = "Shoot: "
+    if stripped.startswith(prefix):
+        return stripped[len(prefix) :]
+    return stripped
+
+
+def extract_notification_features(
+    text: str | None,
+    vocabulary: tuple[str, ...] = NOTIFICATION_VOCABULARY,
+) -> np.ndarray:
+    features = np.zeros(len(vocabulary), dtype=np.float32)
+    label = parse_notification_label(text)
+    if label in vocabulary:
+        features[vocabulary.index(label)] = 1.0
+    return features
+
+
+def observation_feature_dim(observation_mode: str) -> int:
+    if observation_mode == "vision_audio":
+        return 4
+    if observation_mode == "vision_notifications":
+        return len(NOTIFICATION_VOCABULARY)
+    raise ValueError(f"El modo de observacion '{observation_mode}' no usa features auxiliares.")
 
 
 def button_name(button: object) -> str:
@@ -216,7 +215,7 @@ def build_button_combination_actions(
     return tuple(labels), tuple(actions)
 
 
-class DoomEnv(gym.Env[Observation, AgentAction]):
+class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 35}
 
     def __init__(
@@ -269,21 +268,35 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
             )
         else:
             self.action_space = gym.spaces.Discrete(self.button_count)
-        self.observation_space = gym.spaces.Box(
-            low=0,
-            high=255,
-            shape=(
-                profile_observation_channels(self.observation_mode),
-                self.observation_height,
-                self.observation_width,
-            ),
-            dtype=np.uint8,
-        )
+        if self.observation_mode in {"vision_audio", "vision_notifications"}:
+            self.observation_space = gym.spaces.Dict(
+                {
+                    "image": gym.spaces.Box(
+                        low=0,
+                        high=255,
+                        shape=(1, self.observation_height, self.observation_width),
+                        dtype=np.uint8,
+                    ),
+                    "features": gym.spaces.Box(
+                        low=-1.0,
+                        high=1.0,
+                        shape=(observation_feature_dim(self.observation_mode),),
+                        dtype=np.float32,
+                    ),
+                }
+            )
+        else:
+            self.observation_space = gym.spaces.Box(
+                low=0,
+                high=255,
+                shape=(1, self.observation_height, self.observation_width),
+                dtype=np.uint8,
+            )
 
     def step(
         self,
         action: AgentAction,
-    ) -> tuple[Observation, float, bool, bool, dict[str, object]]:
+    ) -> tuple[Observation | DictObservation, float, bool, bool, dict[str, object]]:
         binary_action = self._normalize_action(action)
         raw_reward = float(self.game.make_action(binary_action.tolist()))
         self._elapsed_steps += 1
@@ -311,7 +324,7 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         self,
         seed: int | None = None,
         options: dict[str, object] | None = None,
-    ) -> tuple[Observation, dict[str, object]]:
+    ) -> tuple[Observation | DictObservation, dict[str, object]]:
         super().reset(seed=seed)
         self.game.new_episode()
         self._visited_cells.clear()
@@ -360,50 +373,27 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
             )
         return np.clip(normalized_action, 0, 1)
 
-    def _observation_from_state(self, state: zd.GameState | None) -> Observation:
-        if state is None:
-            shape = cast(tuple[int, int, int], self.observation_space.shape)
-            return np.zeros(shape, dtype=np.uint8)
-        channels = [
+    def _observation_from_state(
+        self, state: zd.GameState | None
+    ) -> Observation | DictObservation:
+        image = (
             preprocess_frame(
                 state.screen_buffer,
                 width=self.observation_width,
                 height=self.observation_height,
             )
-        ]
+            if state is not None
+            else np.zeros((1, self.observation_height, self.observation_width), dtype=np.uint8)
+        )
         if self.observation_mode == "vision_audio":
-            channels.append(
-                preprocess_aux_buffer(
-                    observation_aux_buffer(state, self.observation_mode),
-                    width=self.observation_width,
-                    height=self.observation_height,
-                )
+            audio_buffer = getattr(state, "audio_buffer", None) if state is not None else None
+            return {"image": image, "features": extract_audio_features(audio_buffer)}
+        if self.observation_mode == "vision_notifications":
+            notifications = (
+                getattr(state, "notifications_buffer", None) if state is not None else None
             )
-        elif self.observation_mode == "vision_notifications":
-            channels.append(
-                preprocess_aux_buffer(
-                    observation_aux_buffer(state, self.observation_mode),
-                    width=self.observation_width,
-                    height=self.observation_height,
-                )
-            )
-        return np.concatenate(channels, axis=0)
-
-
-def profile_observation_channels(observation_mode: str) -> int:
-    if observation_mode == "vision":
-        return 1
-    if observation_mode in {"vision_audio", "vision_notifications"}:
-        return 2
-    raise ValueError(f"Modo de observacion no soportado: {observation_mode}")
-
-
-def observation_aux_buffer(state: zd.GameState, observation_mode: str) -> object:
-    if observation_mode == "vision_audio":
-        return getattr(state, "audio_buffer", None)
-    if observation_mode == "vision_notifications":
-        return getattr(state, "notifications_buffer", None)
-    return None
+            return {"image": image, "features": extract_notification_features(notifications)}
+        return image
 
 
 def build_doom_game(profile: TrainingProfile, project_paths: ProjectPaths) -> zd.DoomGame:

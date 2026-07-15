@@ -14,11 +14,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from doom_agent.config import build_project_paths, get_training_profile
 from doom_agent.envs import make_vectorized_env
 from doom_agent.envs.doom_env import (
+    NOTIFICATION_VOCABULARY,
     bucket_position,
     build_button_combination_actions,
     compute_exploration_bonus,
     decayed_exploration_bonus,
+    extract_audio_features,
+    extract_notification_features,
     has_opposing_buttons,
+    parse_notification_label,
 )
 
 
@@ -203,16 +207,12 @@ class EnvironmentSmokeTests(unittest.TestCase):
         profile = get_training_profile("default", scenario_name="basic_audio")
         env = make_vectorized_env(profile, project_paths)
         try:
-            observation = cast(np.ndarray, env.reset())
+            observation = cast(dict[str, np.ndarray], env.reset())
             self.assertEqual(
-                observation.shape,
-                (
-                    1,
-                    profile.stacked_observation_channels,
-                    profile.screen_height,
-                    profile.screen_width,
-                ),
+                observation["image"].shape,
+                (1, profile.frame_stack, profile.screen_height, profile.screen_width),
             )
+            self.assertEqual(observation["features"].shape, (1, profile.frame_stack * 4))
             self.assertEqual(
                 env.get_attr("action_labels")[0],
                 ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
@@ -225,15 +225,14 @@ class EnvironmentSmokeTests(unittest.TestCase):
         profile = get_training_profile("default", scenario_name="basic_notifications")
         env = make_vectorized_env(profile, project_paths)
         try:
-            observation = cast(np.ndarray, env.reset())
+            observation = cast(dict[str, np.ndarray], env.reset())
             self.assertEqual(
-                observation.shape,
-                (
-                    1,
-                    profile.stacked_observation_channels,
-                    profile.screen_height,
-                    profile.screen_width,
-                ),
+                observation["image"].shape,
+                (1, profile.frame_stack, profile.screen_height, profile.screen_width),
+            )
+            self.assertEqual(
+                observation["features"].shape,
+                (1, profile.frame_stack * len(NOTIFICATION_VOCABULARY)),
             )
             self.assertEqual(
                 env.get_attr("action_labels")[0],
@@ -325,6 +324,50 @@ class EnvironmentSmokeTests(unittest.TestCase):
 
     def test_decayed_exploration_bonus_disabled_stays_constant(self) -> None:
         self.assertEqual(decayed_exploration_bonus(0.02, 500, 0), 0.02)
+
+    def test_extract_audio_features_returns_zeros_for_missing_buffer(self) -> None:
+        features = extract_audio_features(None)
+        self.assertEqual(features.shape, (4,))
+        self.assertTrue(np.array_equal(features, np.zeros(4, dtype=np.float32)))
+
+    def test_extract_audio_features_detects_left_louder_than_right(self) -> None:
+        loud_left = np.zeros((100, 2), dtype=np.int16)
+        loud_left[:, 0] = 20000
+        loud_left[:, 1] = 2000
+
+        features = extract_audio_features(loud_left)
+
+        rms_left, rms_right, pan, loudness = features
+        self.assertGreater(rms_left, rms_right)
+        self.assertGreater(pan, 0.0)
+        self.assertGreater(loudness, 0.0)
+        self.assertTrue(np.all(np.abs(features) <= 1.0))
+
+    def test_extract_audio_features_silence_has_zero_pan_and_loudness(self) -> None:
+        silence = np.zeros((100, 2), dtype=np.int16)
+        features = extract_audio_features(silence)
+        self.assertTrue(np.array_equal(features, np.zeros(4, dtype=np.float32)))
+
+    def test_parse_notification_label_strips_prefix_and_suffix(self) -> None:
+        self.assertEqual(parse_notification_label("Shoot: Cacodemon\n"), "Cacodemon")
+        self.assertEqual(parse_notification_label(""), "")
+        self.assertEqual(parse_notification_label(None), "")
+
+    def test_extract_notification_features_one_hot_encodes_known_label(self) -> None:
+        features = extract_notification_features("Shoot: Demon\n")
+        expected = np.zeros(len(NOTIFICATION_VOCABULARY), dtype=np.float32)
+        expected[NOTIFICATION_VOCABULARY.index("Demon")] = 1.0
+        self.assertTrue(np.array_equal(features, expected))
+
+    def test_extract_notification_features_empty_text_selects_empty_slot(self) -> None:
+        features = extract_notification_features("")
+        expected = np.zeros(len(NOTIFICATION_VOCABULARY), dtype=np.float32)
+        expected[NOTIFICATION_VOCABULARY.index("")] = 1.0
+        self.assertTrue(np.array_equal(features, expected))
+
+    def test_extract_notification_features_unknown_label_returns_zeros(self) -> None:
+        features = extract_notification_features("Shoot: Cyberdemon\n")
+        self.assertTrue(np.array_equal(features, np.zeros(len(NOTIFICATION_VOCABULARY), dtype=np.float32)))
 
     def test_environment_tracks_visited_cells_after_reset_when_exploration_bonus_enabled(
         self,
