@@ -53,6 +53,9 @@ class TrainingProfilePayload(TypedDict, total=False):
     reward_shaping: RewardShapingPayload
     early_stopping: EarlyStoppingPayload
     curriculum: list[CurriculumStagePayload]
+    exploration_bonus: float
+    exploration_grid_size: float
+    exploration_bonus_decay_steps: int
     effective_timesteps: int
     uses_rounded_timesteps: bool
 

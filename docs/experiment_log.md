@@ -16,6 +16,296 @@ Cada entrada debe incluir:
 
 ## Entradas
 
+### 2026-07-14 (piloto deadly_corridor, cierre oficial + bug critico en promote-checkpoint)
+
+- escenario: `deadly_corridor` (y `basic`, afectado por el incidente)
+- fase entrenamiento: `Fase 4`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - piloto `from-scratch`, `SEED=42`, `TIMESTEPS=300000`, run_id `doom_foundation_agent__deadly_corridor__20260714T175934084462Z`
+  - eval periodica (12 checkpoints): reward siempre positivo, rango `36.5` a `49.5`, sin colapso de acciones (mezcla sana de `MOVE_FORWARD`, `MOVE_FORWARD+ATTACK`, `ATTACK`, giros, strafes); mejor eval en step `75000`, nunca superado despues (politica determinista se satura temprano, pesos siguen cambiando pero `argmax` deja de cambiar)
+  - eval offline 50 episodios: best (step 75000) y final (step 300000) dan resultados **identicos** (`mean_reward=43.623`, `std=16.615`, `mean_episode_length=56.06`); confirmado con `md5sum` que son archivos genuinamente distintos, la politica determinista simplemente convergio a las mismas decisiones desde step 75000 en adelante
+  - **incidente critico**: `make promote CHECKPOINT=artifacts\checkpoints\doom_foundation_agent__deadly_corridor_best.zip PROMOTE_EPISODES=50` (sin `SCENARIO=` explicito) **sobrescribio el checkpoint promovido oficial de `basic`** (`doom_foundation_agent_promoted.zip`), el baseline congelado del proyecto
+  - causa raiz: `src/doom_agent/services/promoter.py` resolvia el nombre del alias promovido usando `get_training_profile(profile_name, scenario_name=scenario_name)` con `scenario_name=None` (porque `--scenario` no se paso), lo que caia al escenario default (`basic`) en vez de usar el escenario real del checkpoint que se estaba promoviendo
+  - verificado que la perdida era recuperable: `doom_foundation_agent_active.zip` (alias `active`, distinto del `promoted` dañado) seguia intacto con los pesos correctos de `basic` (`scenario_key=basic`, `saved_timesteps=1501184`)
+  - recuperacion: `make promote CHECKPOINT=artifacts\checkpoints\doom_foundation_agent_active.zip SCENARIO=basic PROMOTE_EPISODES=50` reconstruyo `doom_foundation_agent_promoted.zip` con resultado identico al documentado historicamente (`mean_reward=-11.840`, `std=11.256`, `mean_episode_length=13.840`)
+  - fix aplicado en `src/doom_agent/services/promoter.py`: se elimino la dependencia de `get_training_profile`/`target_profile` para nombrar el alias promovido; ahora se deriva directamente de `source_metadata["profile"]["checkpoint_name"]` (metadata embebida en el checkpoint que se esta promoviendo), correcto sin importar si se invoca con `--checkpoint` explicito o `--scenario`
+  - agregado test de regresion `test_promote_checkpoint_uses_source_scenario_name_not_default_when_scenario_omitted` en `tests/services/test_promoter.py`, reproduce exactamente el trigger del bug (checkpoint explicito de un escenario no-default, sin pasar `scenario_name`) y verifica que el alias promovido usa el nombre correcto
+  - re-promovido `deadly_corridor` con el fix aplicado: `doom_foundation_agent__deadly_corridor_promoted.zip` creado correctamente esta vez
+- comando ejecutado:
+  - `make train-from-scratch SCENARIO=deadly_corridor SEED=42 TIMESTEPS=300000`
+  - `make evaluate SCENARIO=deadly_corridor EPISODES=50 NO_RENDER=1 JSON=1` / `python src/cli.py evaluate ... final_model.zip`
+  - `md5sum` para confirmar que best/final eran archivos distintos pese a resultados identicos
+  - `make promote CHECKPOINT=...deadly_corridor_best.zip PROMOTE_EPISODES=50` (disparo del bug)
+  - inspeccion de `doom_foundation_agent_promoted.json`, `doom_foundation_agent_active.json`, `doom_foundation_agent_best.json`, `doom_foundation_agent.json` para confirmar recuperabilidad
+  - `make promote CHECKPOINT=...doom_foundation_agent_active.zip SCENARIO=basic PROMOTE_EPISODES=50` (recuperacion de `basic`)
+  - `make check` (validacion del fix, `106` tests)
+  - `make promote CHECKPOINT=...deadly_corridor_best.zip SCENARIO=deadly_corridor PROMOTE_EPISODES=50` (re-promocion correcta de `deadly_corridor`)
+- resultado observado:
+  - `basic` recuperado exacto, sin perdida de datos real (solo el alias se dañaba, los pesos originales en `_active.zip` nunca se tocaron)
+  - `deadly_corridor` promovido correctamente como primer cierre oficial: `mean_reward=43.623`, `std=16.615`, `mean_episode_length=56.06`
+  - `106` tests pasando (105 previos + 1 regresion)
+- decision siguiente:
+  - `deadly_corridor` cerrado oficial, primer piloto de un escenario `doom_skill=5` con reward denso y positivo, sin colapso
+  - **recomendacion fuerte**: cualquier `make promote CHECKPOINT=...` futuro debe incluir `SCENARIO=<escenario>` explicito hasta confiar plenamente en el fix en produccion real (ya cubierto por test, pero el costo de un error es alto: puede sobrescribir un baseline congelado)
+  - decidir si se integra `deathmatch` (ultimo escenario oficial de ViZDoom sin integrar) o se cierra el curriculum aqui
+
+### 2026-07-14 (integracion deadly_corridor, Fase 4)
+
+- escenario: `deadly_corridor`
+- fase entrenamiento: `Fase 4`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - copiados `deadly_corridor.cfg` y `deadly_corridor.wad` desde ViZDoom a `data/scenarios/`
+  - 7 botones (`MOVE_LEFT`, `MOVE_RIGHT`, `ATTACK`, `MOVE_FORWARD`, `MOVE_BACKWARD`, `TURN_LEFT`, `TURN_RIGHT`); ningun preset existente los cubria, se creo preset nuevo `corridor_combat` en `src/doom_agent/envs/doom_env.py` (8 acciones: ATTACK, MOVE_FORWARD, MOVE_FORWARD+ATTACK, MOVE_BACKWARD, TURN_LEFT, TURN_RIGHT, MOVE_LEFT, MOVE_RIGHT)
+  - agregado `corridor_combat` a la lista de presets validos en `src/doom_agent/config/schema.py`
+  - creado `configs/scenarios/deadly_corridor.toml`, mismos hiperparametros estandar del proyecto (`learning_rate=0.0001`, `TIMESTEPS=300000` para primer piloto)
+  - agregados tests: `test_corridor_combat_actions_cover_navigation_and_attack`, `test_deadly_corridor_scenario_uses_corridor_combat_profile`, `test_deadly_corridor_preset_matches_available_buttons`
+  - actualizada tupla esperada de escenarios en `test_training_catalog_is_loaded_from_split_toml`
+  - actualizada documentacion: `vizdoom_escenarios_oficiales.md` (tambien se corrigio que `health_gathering_supreme` no aparecia en la lista de integrados, gap previo), `plan_escenarios.md`, `estado_actual.md`
+  - decision con el usuario: `deadly_corridor` elegido sobre `deathmatch` como siguiente paso de Fase 4, por action space mucho mas manejable (7 botones vs 16 binarios + 3 delta de `deathmatch`)
+  - sin transfer learning posible: `doom_skill=5` (dificultad alta) y action space nuevo, sin checkpoint previo compatible; primer piloto sera `from-scratch`
+- comando ejecutado:
+  - `make check` (corrido por el usuario, no por Claude directamente — feedback explicito de que el usuario prefiere correr `make`/CLI el mismo, incluso validaciones rapidas como `make check`)
+- resultado observado:
+  - `105` tests pasando (102 previos + 3 nuevos)
+  - no hizo falta cambiar codigo core de entorno mas alla de agregar el preset; arquitectura de presets ya soportaba agregar uno nuevo sin tocar `DoomEnv`
+- decision siguiente:
+  - correr piloto inicial: `make train-from-scratch SCENARIO=deadly_corridor SEED=42 TIMESTEPS=300000`
+  - evaluar offline con `50` episodios antes de promover
+  - `deathmatch` queda como ultimo escenario oficial de ViZDoom sin integrar, decidir despues del piloto de `deadly_corridor`
+
+### 2026-07-14 (my_way_home: cierre definitivo tras intento con decaimiento, revert de config)
+
+- escenario: `my_way_home`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - completado intento 4 (bonus con decaimiento lineal a 150000 steps), run_id `doom_foundation_agent__my_way_home__20260714T135745889554Z`
+  - eval offline 50 episodios: best (step 75000) `mean_reward=-0.147`, `std=0.170`, `mean_episode_length=2058.58`; final (step 300000) `mean_reward=-0.175`, `std=0.025`, `mean_episode_length=2100.0` (0% exito)
+  - comparacion final entre los tres intentos entrenados (original sin bonus, bonus constante, bonus con decaimiento): los tres `mean_episode_length` del best model son practicamente identicos (2063.1, 2063.1, 2058.58); ninguna variante de reward shaping por exploracion cambio la tasa real de exito de forma medible
+  - conclusion: el bonus de exploracion (constante o decaido) no es la palanca correcta para este escenario; causa mas probable es limitacion fundamental de PPO on-policy con meta dispersa en laberinto grande, no densidad de reward
+  - revertida `configs/scenarios/my_way_home.toml` a default (`exploration_bonus`, `exploration_grid_size`, `exploration_bonus_decay_steps` removidos, quedan en su default `0.0`/`48.0`/`0` como cualquier otro escenario)
+  - actualizados tests que asumian el bonus activo en `my_way_home`: eliminado `test_my_way_home_scenario_enables_exploration_bonus` (ya no aplica), reemplazado `test_my_way_home_environment_tracks_visited_cells_after_reset` por dos tests que verifican el comportamiento con bonus explicitamente habilitado via override de perfil (`test_environment_tracks_visited_cells_after_reset_when_exploration_bonus_enabled`) y con bonus desactivado por default (`test_environment_does_not_track_visited_cells_when_exploration_bonus_disabled`)
+- comando ejecutado:
+  - `python src/cli.py evaluate --checkpoint .../final_model.zip --scenario my_way_home --episodes 50 --no-render --json` (intento 4, final)
+  - `make evaluate SCENARIO=my_way_home EPISODES=50 NO_RENDER=1 JSON=1` (intento 4, best)
+  - `make check` (validacion post-revert, `102` tests)
+- resultado observado:
+  - `102` tests pasando tras arreglar los dos tests desactualizados
+  - codigo de reward shaping por exploracion (`bucket_position`, `compute_exploration_bonus`, `decayed_exploration_bonus`) queda disponible, testeado y documentado en memoria del proyecto para uso futuro en otros escenarios de navegacion, aunque no resolvio `my_way_home`
+- decision siguiente:
+  - `my_way_home` queda pendiente definitivo, mismo tratamiento que `predict_position`
+  - no reintentar salvo que se invierta en presupuesto de timesteps mucho mayor (2-5M+) o motivacion intrinseca real (curiosity/ICM)
+  - curriculum sigue: decidir entre `deadly_corridor` y `deathmatch` como siguiente escenario
+
+### 2026-07-14 (my_way_home intento 1 con exploration bonus: resultado y ajuste a decaimiento)
+
+- escenario: `my_way_home`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - primer piloto con `exploration_bonus = 0.02` constante (sin decaimiento), `from-scratch`, `SEED=42`, `TIMESTEPS=300000`
+  - resultado offline 50 episodios: best (step 50000) `mean_reward=-0.106`, `std=0.196`, `mean_episode_length=2063.1` (algunos episodios llegaron a la meta); final (step 300000) `mean_reward=-0.149`, `std=0.062`, `mean_episode_length=2100.0` (0 de 50 episodios llego a la meta)
+  - hallazgo clave: `mean_episode_length` del best (`2063.1`) coincide exactamente con el del intento original sin exploration bonus (piloto de 2026-07-13); la tasa real de exito no mejoro de forma medible pese al bonus
+  - diagnostico: el bonus por celda visitada no es "potential-based" (no preserva la politica optima del problema original); permite que la politica aprenda a "cosechar" bonus por explorar en vez de perseguir la meta dispersa. Eval periodica confirma: `mean_episode_length` volvio a `2100.0` exacto en las 10 evaluaciones posteriores al step 50000, sugiriendo que la politica encontro la meta por casualidad temprano y luego derivo hacia comportamiento de "farmear" el bonus
+  - decision con el usuario: no promover, ajustar a intento 2 con decaimiento lineal del bonus
+  - implementado `decayed_exploration_bonus(base_bonus, elapsed_steps, decay_steps)` en `src/doom_agent/envs/doom_env.py`, nuevo campo de perfil `exploration_bonus_decay_steps` (default `0` = sin decaimiento, compatible con escenarios existentes)
+  - `configs/scenarios/my_way_home.toml`: agregado `exploration_bonus_decay_steps = 150000` (decae a cero en la primera mitad del presupuesto de `300000` steps)
+  - agregados tests: `test_decayed_exploration_bonus_linearly_reduces_to_zero`, `test_decayed_exploration_bonus_disabled_stays_constant`, `test_my_way_home_scenario_enables_exploration_bonus` actualizado con el nuevo campo
+- comando ejecutado:
+  - `make train-from-scratch SCENARIO=my_way_home SEED=42 TIMESTEPS=300000` (intento 1, sin decaimiento)
+  - `make evaluate SCENARIO=my_way_home EPISODES=50 NO_RENDER=1 JSON=1` (best)
+  - `python src/cli.py evaluate --checkpoint .../final_model.zip --scenario my_way_home --episodes 50 --no-render --json` (final)
+  - `make check` (validacion del ajuste v2, 102 tests)
+  - verificacion manual en runtime real del threading de `exploration_bonus_decay_steps`
+- resultado observado:
+  - `102` tests pasando
+  - intento 1 no promovido; diagnostico de reward hacking documentado
+- decision siguiente:
+  - lanzar intento 2 (decaimiento lineal): `make train-from-scratch SCENARIO=my_way_home SEED=42 TIMESTEPS=300000`
+  - evaluar offline con `50` episodios; comparar `mean_episode_length` contra los `2063.1`/`2100.0` de intentos previos como referencia de exito real
+  - si intento 2 tampoco muestra mejora medible en tasa de exito, dejar `my_way_home` pendiente definitivamente (igual que `predict_position`), documentando que reward shaping por exploracion no resuelve este escenario
+
+### 2026-07-14 (reward shaping para my_way_home, cambio de codigo)
+
+- escenario: `my_way_home` (y evaluacion de factibilidad para `predict_position`)
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - investigacion: se listaron las 134 `GameVariable` de ViZDoom; confirmado que `POSITION_X`/`POSITION_Y` del jugador existen y son consultables via `game.get_game_variable(...)` sin necesidad de declararlas en `available_game_variables` del `.cfg` (verificado empiricamente)
+  - confirmado que `predict_position` NO tiene forma de acceder a la posicion del objetivo movil (ninguna `GameVariable` la expone); reward shaping por distancia/angulo es inviable sin modificar el WAD/ACS del escenario, fuera de alcance del proyecto; decision con el usuario: `predict_position` queda pendiente indefinido, documentado como bloqueo tecnico, no de esfuerzo
+  - implementado bonus de exploracion por celda nueva del mapa para `my_way_home`:
+    - `bucket_position(x, y, grid_size)` y `compute_exploration_bonus(cell, visited_cells, bonus)` en `src/doom_agent/envs/doom_env.py`, funciones puras testeables sin dependencia de ViZDoom
+    - `DoomEnv` trackea `_visited_cells` por episodio (reset en `reset()`, poblado en `step()` via `_current_cell()`)
+    - nuevos campos de perfil `exploration_bonus` (default `0.0`) y `exploration_grid_size` (default `48.0`) en `TrainingProfile`, `TrainingProfilePayload`, validacion, `to_dict`/`from_dict`, y agregados a `resume_compatibility_signature` (cambiar el bonus fuerza from-scratch o `--allow-scenario-resume`)
+    - `configs/scenarios/my_way_home.toml`: `exploration_bonus = 0.02`, `exploration_grid_size = 48.0`
+    - mecanismo generico y reusable, no exclusivo de `my_way_home`; otros escenarios quedan en `0.0` (desactivado) por defecto, sin cambio de comportamiento
+  - agregados tests: `test_bucket_position_groups_nearby_coordinates_into_same_cell`, `test_compute_exploration_bonus_rewards_new_cells_only_once`, `test_my_way_home_environment_tracks_visited_cells_after_reset`, `test_my_way_home_scenario_enables_exploration_bonus`, `test_other_scenarios_default_exploration_bonus_disabled`
+- comando ejecutado:
+  - `make check`
+  - script manual de verificacion en runtime real (100 pasos avanzando en `my_way_home`, confirmando `raw_reward` positivo exactamente al cruzar de celda)
+- resultado observado:
+  - `100` tests pasando (95 previos + 5 nuevos)
+  - verificacion runtime: bonus se dispara correctamente (`raw_reward=0.0199` = `0.02` bonus `- 0.0001` living_reward, en los pasos donde el agente cruza a una celda nueva)
+- decision siguiente:
+  - correr reintento de `my_way_home` con `make train-from-scratch SCENARIO=my_way_home SEED=42 TIMESTEPS=300000` (config ya actualizada con el bonus)
+  - evaluar offline con `50` episodios; promover solo si el agente alcanza la meta de forma consistente
+  - `predict_position` permanece pendiente indefinido, sin plan de reintento salvo que aparezcan herramientas de edicion WAD/ACS
+
+### 2026-07-14 (piloto health_gathering_supreme, cierre oficial)
+
+- escenario: `health_gathering_supreme`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - piloto via transfer learning desde checkpoint promovido de `health_gathering` (`mean_reward=1580.28`)
+  - resume con `2300000` steps heredados + `301056` steps adicionales (`TIMESTEPS=300000` solicitados)
+  - `ALLOW_SCENARIO_RESUME=1` para saltar chequeo estricto (mismo action space, distinto `scenario_name`)
+  - sin incidentes de infraestructura esta vez (exclusion de Defender aplicada previamente funciono)
+- comando ejecutado:
+  - `make train SCENARIO=health_gathering_supreme RESUME=artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip ALLOW_SCENARIO_RESUME=1 TIMESTEPS=300000`
+  - `make evaluate SCENARIO=health_gathering_supreme EPISODES=50 NO_RENDER=1 JSON=1`
+  - `make promote CHECKPOINT=artifacts\checkpoints\doom_foundation_agent__health_gathering_supreme.zip PROMOTE_EPISODES=50`
+- resultado observado:
+  - run_id: `doom_foundation_agent__health_gathering_supreme__20260714T071306043795Z`
+  - eval periodica (12 checkpoints, steps 2325000 a 2600000): rango `372.4` a `550.8` de mean_reward, siempre positivo, sin colapso
+  - `best_mean_reward_so_far` se mantuvo heredado en `1580.28` (umbral de `health_gathering`) durante toda la corrida; ninguna eval lo supero, por eso nunca se guardo un `best_model.zip` propio de este escenario
+  - eval offline 50 episodios (sobre `final_model.zip`, unico checkpoint disponible): `mean_reward = 416.02`, `std_reward = 85.45`, `mean_episode_length = 418.02`
+  - accion dominante `TURN_RIGHT+MOVE_FORWARD` con sesgo hasta `62%` en algunos checkpoints intermedios, sin llegar a colapso total de politica
+  - resultado muy distinto a `my_way_home`/`predict_position`: reward denso (no disperso), agente claramente funcional, solo con techo mas bajo por el layout mas dificil
+- decision siguiente:
+  - promovido como primer cierre oficial de `health_gathering_supreme` (no habia checkpoint previo que superar)
+  - confirma que transfer learning es la estrategia correcta cuando el action space es identico entre escenarios
+  - siguiente paso del curriculum: decidir entre `deadly_corridor` y `deathmatch` (unicos escenarios oficiales de ViZDoom que faltan integrar)
+
+### 2026-07-14 (integracion health_gathering_supreme)
+
+- escenario: `health_gathering_supreme`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - copiados `health_gathering_supreme.cfg` y `health_gathering_supreme.wad` desde ViZDoom a `data/scenarios/`
+  - creado `configs/scenarios/health_gathering_supreme.toml`, reusa preset `health_navigation` (botones TURN_LEFT, TURN_RIGHT, MOVE_FORWARD, identicos a `health_gathering`)
+  - agregado test `test_health_gathering_supreme_scenario_uses_navigation_profile` en `tests/configuration/test_config.py`
+  - agregado test `test_health_gathering_supreme_navigation_preset_matches_available_buttons` en `tests/envs/test_environment.py`
+  - actualizada tupla esperada de escenarios en `test_training_catalog_is_loaded_from_split_toml`
+  - actualizada documentacion: `plan_escenarios.md`, `estado_actual.md`
+  - decision con el usuario: piloto via transfer learning desde checkpoint promovido de `health_gathering` (`mean_reward=1580.28`), dado que action space es identico (mismo preset, mismos botones); no from-scratch
+- comando ejecutado:
+  - `make check`
+- resultado observado:
+  - `95` tests pasando (93 previos + 2 nuevos)
+  - no hizo falta cambiar codigo core; preset `health_navigation` ya cubria el action space
+- decision siguiente:
+  - lanzar `make train SCENARIO=health_gathering_supreme RESUME=artifacts\checkpoints\doom_foundation_agent__health_gathering_promoted.zip ALLOW_SCENARIO_RESUME=1 TIMESTEPS=300000`
+  - evaluar offline con `50` episodios, comparar contra baseline `health_gathering`
+
+### 2026-07-14 (piloto predict_position, resultado)
+
+- escenario: `predict_position`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - primer piloto `from-scratch`, `SEED=42`, `TIMESTEPS=300000`
+  - corrida se dividio en 4 tramos por dos incidentes de infraestructura no relacionados a la config:
+    1. crash `vizdoom.vizdoom.ViZDoomErrorException: Could not rebuild framebuffer` en step 125001 (probable hiccup de GPU/pantalla)
+    2. crash repetido `PermissionError: [WinError 32]` al copiar el checkpoint `_active.zip`, causado por Windows Defender bloqueando el archivo recien escrito; esto ademas rompio el resume automatico dos veces (`RESUME=auto` volvia siempre al checkpoint viejo de step 25000 en vez de continuar)
+  - arreglo aplicado: `Add-MpPreference -ExclusionPath "E:\agente-doom\artifacts"` (exclusion de Defender), y resume manual explicito apuntando al checkpoint real mas avanzado en vez de depender del alias `_active` roto
+  - acumulado final real: `301480` steps
+- comando ejecutado (resumen, ver detalle en conversacion):
+  - `make train-from-scratch SCENARIO=predict_position SEED=42 TIMESTEPS=300000`
+  - `make train SCENARIO=predict_position RESUME=<checkpoint explicito> TIMESTEPS=...` (varias veces, para sortear el bug de resume)
+  - `make evaluate SCENARIO=predict_position EPISODES=50 NO_RENDER=1 JSON=1` (best model)
+  - `python src/cli.py evaluate --checkpoint .../final_model.zip --scenario predict_position --episodes 50 --no-render --json` (final model)
+- resultado observado:
+  - run_id final: `doom_foundation_agent__predict_position__20260714T062711396598Z`
+  - best model: `mean_reward = -0.300`, `std_reward = 0.0`, `mean_episode_length = 300.0`
+  - final model: `mean_reward = -0.300`, `std_reward = 0.0`, `mean_episode_length = 300.0`
+  - `-0.300` es exactamente `living_reward (-0.001) x episode_timeout (300)`: el agente nunca impacto el objetivo movil, en ninguna de las 12+ evaluaciones periodicas a lo largo de todo el entrenamiento ni en los 50 episodios de evaluacion offline final (ambos checkpoints)
+  - accion dominante oscilo entre `TURN_LEFT+ATTACK` y `ATTACK` puro sin patron claro de puntería, consistente con politica que nunca aprendio a sincronizar el disparo
+  - bug adicional encontrado: columna `resume_mode` en `training_runs` (Postgres) es `VARCHAR(80)`; al usar `--resume` con ruta de checkpoint explicita (mas larga que 80 caracteres) la persistencia remota de esa corrida especifica fallo (`StringDataRightTruncation`); reporte local no se vio afectado
+- decision siguiente:
+  - no promover ningun checkpoint de este piloto
+  - `predict_position` queda en estado "pendiente", mismo tratamiento que `my_way_home`
+  - reward binario (solo +1 al impactar, sin señal parcial) es la causa de fondo; timesteps y `ent_coef` no son la palanca correcta
+  - si se retoma en el futuro, la mejora candidata es reward shaping (bonus por cercania angular al objetivo), cambio de codigo en `doom_env.py`, no solo config
+  - pendiente decidir si se amplia la columna `resume_mode` via migracion Alembic
+  - curriculum avanza a `health_gathering_supreme` sin esperar a `predict_position`
+
+### 2026-07-13 (integracion predict_position)
+
+- escenario: `predict_position`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - copiados `predict_position.cfg` y `predict_position.wad` desde ViZDoom a `data/scenarios/`
+  - creado `configs/scenarios/predict_position.toml`, reusa preset `turn_combat` (botones TURN_LEFT, TURN_RIGHT, ATTACK, identicos a `defend_the_center`/`defend_the_line`)
+  - agregado test `test_predict_position_scenario_uses_turn_combat_profile` en `tests/configuration/test_config.py`
+  - agregado test `test_predict_position_turn_preset_matches_available_buttons` en `tests/envs/test_environment.py`
+  - actualizada tupla esperada de escenarios en `test_training_catalog_is_loaded_from_split_toml`
+  - actualizada documentacion: `vizdoom_escenarios_oficiales.md`, `plan_escenarios.md`, `estado_actual.md`
+- comando ejecutado:
+  - `make check`
+- resultado observado:
+  - `93` tests pasando (91 previos + 2 nuevos), sin romper nada existente
+  - no hizo falta cambiar codigo core (`doom_env.py`); preset `turn_combat` ya cubria el action space del escenario
+- decision siguiente:
+  - correr piloto inicial de `predict_position` con `make train-from-scratch SCENARIO=predict_position SEED=42 TIMESTEPS=300000`
+  - evaluar offline con `50` episodios antes de promover
+
+### 2026-07-13
+
+- escenario: `my_way_home`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - primer piloto de `my_way_home`, entrenamiento `from-scratch` (action space incompatible con escenarios previos, no habia checkpoint transferible)
+  - config: `SEED=42`, `TIMESTEPS=300000`
+- comando ejecutado:
+  - `make train-from-scratch SCENARIO=my_way_home SEED=42 TIMESTEPS=300000`
+  - `make evaluate SCENARIO=my_way_home EPISODES=50 NO_RENDER=1 JSON=1` (best model)
+  - `python src/cli.py evaluate --checkpoint .../final_model.zip --scenario my_way_home --episodes 50 --no-render --json` (final model)
+- resultado observado:
+  - run_id: `doom_foundation_agent__my_way_home__20260713T125239487614Z`
+  - best model (step 100000): `mean_reward = -0.186`, `std_reward = 0.166`, `mean_episode_length = 2063.1`
+  - final model (step 300000): `mean_reward = -0.210`, `std_reward = 0.0`, `mean_episode_length = 2100.0`
+  - `-0.21` es exactamente `living_reward (-0.0001) x episode_timeout (2100)`: el agente nunca alcanzo la meta en ninguno de los 50 episodios de evaluacion del final model
+  - reward se mantuvo plano durante todo el entrenamiento (sin curva de aprendizaje visible en TensorBoard, iteraciones 1 a 147)
+  - causa probable: reward disperso (unica recompensa positiva es llegar a la meta) combinado con `300000` steps insuficientes para este escenario de navegacion
+- decision siguiente:
+  - no promover ningun checkpoint de este piloto
+  - relanzar `my_way_home` con `TIMESTEPS=1500000` como primer ajuste
+  - si vuelve a fallar, subir `ent_coef` en `configs/scenarios/my_way_home.toml` para forzar mas exploracion
+  - mantener `my_way_home` en estado "piloto fallido, pendiente de reintento" hasta proximo ciclo
+
+### 2026-07-13 (segundo intento, mismo dia)
+
+- escenario: `my_way_home`
+- fase entrenamiento: `Fase 3`
+- fase storage: `Fase 2`
+- cambio realizado:
+  - segundo intento: resume desde `best_model.zip` (step 100000) del piloto anterior
+  - `ent_coef` subido de `0.01` a `0.03` para forzar mas exploracion
+  - `TIMESTEPS=200000` adicionales (acumulado hasta step 300704)
+  - uso de `--allow-scenario-resume` para saltar el chequeo estricto de hiperparametros (ent_coef distinto al checkpoint)
+- comando ejecutado:
+  - `make train SCENARIO=my_way_home RESUME=artifacts\checkpoints\doom_foundation_agent__my_way_home_best.zip ALLOW_SCENARIO_RESUME=1 TIMESTEPS=200000`
+  - `python src/cli.py evaluate --checkpoint .../final_model.zip --scenario my_way_home --episodes 50 --no-render --json`
+- resultado observado:
+  - run_id: `doom_foundation_agent__my_way_home__20260713T165146392158Z`
+  - final model (step 300704): `mean_reward = -0.186`, `std_reward = 0.169`, `mean_episode_length = 2058.58`
+  - practicamente identico al best del piloto anterior (`-0.186` vs `-0.186`); no se supero el techo
+  - `best_reward_so_far` durante esta corrida se mantuvo congelado en `-0.150` (el mismo del piloto anterior), nunca broto un nuevo best
+  - eval periodica igual de inestable: solo el checkpoint de step 200000 empato el mejor valor previo, el resto oscilo en `-0.210` (timeout total)
+  - dato relevante: `rollout/ep_rew_mean` (politica estocastica durante entrenamiento) mejoro de `-0.21` a `-0.0996`, sugiriendo que la exploracion si encuentra la meta mas seguido, pero la politica determinista (usada en eval) no logra capturar ese comportamiento de forma consistente
+- decision siguiente:
+  - no promover ningun checkpoint
+  - `ent_coef` revertido a `0.01` en `configs/scenarios/my_way_home.toml` (no se valido como mejora, se evita drift de config sin justificar)
+  - diagnostico: el problema no es solo exploracion, es reward disperso sin señal de progreso; subir `ent_coef` evito el colapso total pero no rompio el techo
+  - decisión de negocio: no invertir mas tiempo ahora en `my_way_home`; seguir el curriculum y dejar `my_way_home` pendiente
+  - si se retoma en el futuro, la mejora candidata es reward shaping por distancia (requiere exponer `POSITION_X`/`POSITION_Y` en `data/scenarios/my_way_home.cfg` y logica nueva en `doom_env.py`), no solo ajuste de hiperparametros
+
 ### 2026-06-14
 
 - escenario: `basic`

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from doom_agent.config import DEFAULT_PROFILE_NAME, build_project_paths, get_training_profile
+from doom_agent.config import DEFAULT_PROFILE_NAME, build_project_paths
 from doom_agent.services.evaluator import evaluate
 from doom_agent.services.workspace_handoff import (
     publish_local_workspace_state,
@@ -38,7 +38,6 @@ def promote_checkpoint(
         raise ValueError("'episodes' debe ser mayor que cero.")
 
     project_paths = build_project_paths()
-    target_profile = get_training_profile(profile_name, scenario_name=scenario_name)
     summary = evaluate(
         checkpoint_name=checkpoint_name,
         episodes=episodes,
@@ -53,18 +52,19 @@ def promote_checkpoint(
 
     source_checkpoint_path = Path(summary["checkpoint_path"])
     source_checkpoint_stem = source_checkpoint_path.with_suffix("")
+    source_metadata = load_checkpoint_metadata(source_checkpoint_stem)
+    if source_metadata is None:
+        raise ValueError("No se puede promover un checkpoint legacy sin metadata estructurada.")
+
+    source_checkpoint_name = source_metadata["profile"]["checkpoint_name"]
     promoted_checkpoint_path = (
         project_paths.checkpoints_dir
-        / promoted_checkpoint_stem(Path(target_profile.checkpoint_name)).with_suffix(".zip").name
+        / promoted_checkpoint_stem(Path(source_checkpoint_name)).with_suffix(".zip").name
     )
     promoted_checkpoint_stem_path = promoted_checkpoint_path.with_suffix("")
 
     if source_checkpoint_stem == promoted_checkpoint_stem_path:
         raise ValueError("El checkpoint origen ya corresponde al alias promovido.")
-
-    source_metadata = load_checkpoint_metadata(source_checkpoint_stem)
-    if source_metadata is None:
-        raise ValueError("No se puede promover un checkpoint legacy sin metadata estructurada.")
 
     copy_checkpoint_bundle(source_checkpoint_stem, promoted_checkpoint_stem_path)
     update_checkpoint_metadata(

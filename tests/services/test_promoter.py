@@ -107,3 +107,91 @@ class PromoterTests(unittest.TestCase):
             )
         finally:
             shutil.rmtree(root_dir, ignore_errors=True)
+
+    def test_promote_checkpoint_uses_source_scenario_name_not_default_when_scenario_omitted(
+        self,
+    ) -> None:
+        """Regresion: promover con --checkpoint explicito y sin --scenario debe nombrar el
+        alias promovido segun el escenario real del checkpoint, no segun el escenario
+        default ('basic'). Bug real: sobrescribio el promoted de 'basic' al promover un
+        checkpoint de 'defend_the_center' sin pasar scenario_name."""
+        root_dir = Path("artifacts") / "test-temp" / "promoter-regression"
+        shutil.rmtree(root_dir, ignore_errors=True)
+        project_paths = build_project_paths(root_dir=root_dir)
+        project_paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
+        project_paths.auto_checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+        non_default_profile = get_training_profile("default", scenario_name="defend_the_center")
+        source_checkpoint_stem = (
+            project_paths.auto_checkpoints_dir
+            / f"{non_default_profile.checkpoint_name}_50000_steps"
+        )
+        default_profile = get_training_profile("default")
+        wrong_promoted_path = (
+            project_paths.checkpoints_dir
+            / promoted_checkpoint_stem(Path(default_profile.checkpoint_name))
+            .with_suffix(".zip")
+            .name
+        )
+        expected_promoted_path = (
+            project_paths.checkpoints_dir
+            / promoted_checkpoint_stem(Path(non_default_profile.checkpoint_name))
+            .with_suffix(".zip")
+            .name
+        )
+
+        save_checkpoint_bundle(
+            DummyModel(),
+            source_checkpoint_stem,
+            build_checkpoint_metadata(
+                "default",
+                non_default_profile,
+                saved_timesteps=50000,
+                training_status="periodic_checkpoint",
+                checkpoint_role="auto",
+                evaluation_source="training_internal",
+                canonical_checkpoint_path=str(source_checkpoint_stem.with_suffix(".zip")),
+                evaluation_metrics={
+                    "mean_reward": 9.9,
+                    "std_reward": 1.4,
+                    "mean_episode_length": 600.0,
+                    "episodes": 20,
+                },
+            ),
+        )
+
+        try:
+            with (
+                patch(
+                    "doom_agent.services.promoter.build_project_paths",
+                    return_value=project_paths,
+                ),
+                patch(
+                    "doom_agent.services.promoter.evaluate",
+                    return_value={
+                        "checkpoint_path": str(source_checkpoint_stem.with_suffix(".zip")),
+                        "scenario_key": "defend_the_center",
+                        "scenario_name": "defend_the_center.cfg",
+                        "deterministic": True,
+                        "render": False,
+                        "metrics": {
+                            "mean_reward": 9.9,
+                            "std_reward": 1.4,
+                            "mean_episode_length": 600.0,
+                            "episodes": 50,
+                        },
+                    },
+                ),
+            ):
+                # Simula el trigger real del bug: --checkpoint explicito, sin --scenario
+                result = promote_checkpoint(
+                    checkpoint_name=str(source_checkpoint_stem.with_suffix(".zip")),
+                    episodes=50,
+                    scenario_name=None,
+                )
+
+            self.assertEqual(result.promoted_checkpoint_path, expected_promoted_path)
+            self.assertNotEqual(result.promoted_checkpoint_path, wrong_promoted_path)
+            self.assertFalse(wrong_promoted_path.exists())
+        finally:
+            shutil.rmtree(root_dir, ignore_errors=True)

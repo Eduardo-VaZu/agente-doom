@@ -104,6 +104,32 @@ def has_opposing_buttons(button_names: set[str]) -> bool:
     return any(pair.issubset(button_names) for pair in OPPOSING_BUTTON_PAIRS)
 
 
+def bucket_position(x: float, y: float, grid_size: float) -> tuple[int, int]:
+    return (int(x // grid_size), int(y // grid_size))
+
+
+def compute_exploration_bonus(
+    cell: tuple[int, int],
+    visited_cells: set[tuple[int, int]],
+    bonus: float,
+) -> float:
+    if cell in visited_cells:
+        return 0.0
+    visited_cells.add(cell)
+    return bonus
+
+
+def decayed_exploration_bonus(
+    base_bonus: float,
+    elapsed_steps: int,
+    decay_steps: int,
+) -> float:
+    if decay_steps <= 0:
+        return base_bonus
+    progress = min(1.0, elapsed_steps / decay_steps)
+    return base_bonus * (1.0 - progress)
+
+
 def build_button_combination_actions(
     available_button_names: tuple[str, ...],
     preset: str = "default",
@@ -165,6 +191,17 @@ def build_button_combination_actions(
         add_action(("MOVE_RIGHT",))
         return tuple(labels), tuple(actions)
 
+    if preset == "corridor_combat":
+        add_action(("ATTACK",))
+        add_action(("MOVE_FORWARD",))
+        add_action(("MOVE_FORWARD", "ATTACK"))
+        add_action(("MOVE_BACKWARD",))
+        add_action(("TURN_LEFT",))
+        add_action(("TURN_RIGHT",))
+        add_action(("MOVE_LEFT",))
+        add_action(("MOVE_RIGHT",))
+        return tuple(labels), tuple(actions)
+
     actions.append(np.zeros(len(available_button_names), dtype=np.int32))
     labels.append(("NOOP",))
 
@@ -192,6 +229,9 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         action_combo_preset: str,
         render_mode: str,
         reward_shaper: RewardShaper,
+        exploration_bonus: float = 0.0,
+        exploration_grid_size: float = 48.0,
+        exploration_bonus_decay_steps: int = 0,
     ) -> None:
         super().__init__()
         self.game = game
@@ -203,6 +243,11 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
         self.action_combo_preset = action_combo_preset
         self.render_mode = render_mode
         self.reward_shaper = reward_shaper
+        self.exploration_bonus = exploration_bonus
+        self.exploration_grid_size = exploration_grid_size
+        self.exploration_bonus_decay_steps = exploration_bonus_decay_steps
+        self._visited_cells: set[tuple[int, int]] = set()
+        self._elapsed_steps = 0
         self.available_button_names = tuple(
             button_name(button) for button in self.game.get_available_buttons()
         )
@@ -241,6 +286,15 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
     ) -> tuple[Observation, float, bool, bool, dict[str, object]]:
         binary_action = self._normalize_action(action)
         raw_reward = float(self.game.make_action(binary_action.tolist()))
+        self._elapsed_steps += 1
+        if self.exploration_bonus > 0 and not self.game.is_episode_finished():
+            current_bonus = decayed_exploration_bonus(
+                self.exploration_bonus, self._elapsed_steps, self.exploration_bonus_decay_steps
+            )
+            if current_bonus > 0:
+                raw_reward += compute_exploration_bonus(
+                    self._current_cell(), self._visited_cells, current_bonus
+                )
         reward = self.reward_shaper.apply(raw_reward)
         state = self.game.get_state()
         terminated = self.game.is_episode_finished()
@@ -260,8 +314,16 @@ class DoomEnv(gym.Env[Observation, AgentAction]):
     ) -> tuple[Observation, dict[str, object]]:
         super().reset(seed=seed)
         self.game.new_episode()
+        self._visited_cells.clear()
+        if self.exploration_bonus > 0:
+            self._visited_cells.add(self._current_cell())
         state = self.game.get_state()
         return self._observation_from_state(state), {}
+
+    def _current_cell(self) -> tuple[int, int]:
+        x = self.game.get_game_variable(zd.GameVariable.POSITION_X)
+        y = self.game.get_game_variable(zd.GameVariable.POSITION_Y)
+        return bucket_position(x, y, self.exploration_grid_size)
 
     def render(self) -> RenderFrame | list[RenderFrame] | None:
         state = cast(zd.GameState | None, self.game.get_state())
@@ -377,6 +439,9 @@ def make_vectorized_env(
             action_combo_preset=profile.action_combo_preset,
             render_mode="rgb_array",
             reward_shaper=RewardShaper(profile.reward_shaping),
+            exploration_bonus=profile.exploration_bonus,
+            exploration_grid_size=profile.exploration_grid_size,
+            exploration_bonus_decay_steps=profile.exploration_bonus_decay_steps,
         )
 
     env: VecEnv = DummyVecEnv([_build_env])

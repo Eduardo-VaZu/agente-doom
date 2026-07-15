@@ -51,18 +51,18 @@ Escenarios ya integrados en el catalogo local:
 - `basic`
 - `basic_audio`
 - `basic_notifications`
+- `deadly_corridor`
 - `defend_the_center`
 - `defend_the_line`
 - `health_gathering`
+- `health_gathering_supreme`
 - `my_way_home`
+- `predict_position`
 - `take_cover`
 
 Escenarios oficiales todavia no integrados en el catalogo local:
 
-- `deadly_corridor`
 - `deathmatch`
-- `health_gathering_supreme`
-- `predict_position`
 
 ## Tabla de escenarios
 

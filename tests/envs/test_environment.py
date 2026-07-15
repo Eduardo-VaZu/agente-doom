@@ -13,7 +13,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from doom_agent.config import build_project_paths, get_training_profile
 from doom_agent.envs import make_vectorized_env
-from doom_agent.envs.doom_env import build_button_combination_actions, has_opposing_buttons
+from doom_agent.envs.doom_env import (
+    bucket_position,
+    build_button_combination_actions,
+    compute_exploration_bonus,
+    decayed_exploration_bonus,
+    has_opposing_buttons,
+)
 
 
 class EnvironmentSmokeTests(unittest.TestCase):
@@ -94,6 +100,28 @@ class EnvironmentSmokeTests(unittest.TestCase):
             ("ATTACK", "MOVE_LEFT+ATTACK", "MOVE_RIGHT+ATTACK"),
         )
         self.assertTrue(all("ATTACK" in label for label in labels))
+
+    def test_corridor_combat_actions_cover_navigation_and_attack(self) -> None:
+        labels, actions = build_button_combination_actions(
+            ("MOVE_LEFT", "MOVE_RIGHT", "ATTACK", "MOVE_FORWARD", "MOVE_BACKWARD", "TURN_LEFT", "TURN_RIGHT"),
+            preset="corridor_combat",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 8)
+        self.assertEqual(
+            readable_labels,
+            (
+                "ATTACK",
+                "MOVE_FORWARD",
+                "MOVE_FORWARD+ATTACK",
+                "MOVE_BACKWARD",
+                "TURN_LEFT",
+                "TURN_RIGHT",
+                "MOVE_LEFT",
+                "MOVE_RIGHT",
+            ),
+        )
 
     def test_turn_combat_actions_only_include_attack_actions(self) -> None:
         labels, actions = build_button_combination_actions(
@@ -226,6 +254,18 @@ class EnvironmentSmokeTests(unittest.TestCase):
         finally:
             env.close()
 
+    def test_health_gathering_supreme_navigation_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="health_gathering_supreme")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("MOVE_FORWARD", "TURN_LEFT+MOVE_FORWARD", "TURN_RIGHT+MOVE_FORWARD"),
+            )
+        finally:
+            env.close()
+
     def test_take_cover_dodge_preset_matches_available_buttons(self) -> None:
         project_paths = build_project_paths()
         profile = get_training_profile("default", scenario_name="take_cover")
@@ -255,6 +295,91 @@ class EnvironmentSmokeTests(unittest.TestCase):
             self.assertEqual(
                 env.get_attr("action_labels")[0],
                 ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
+            )
+        finally:
+            env.close()
+
+    def test_bucket_position_groups_nearby_coordinates_into_same_cell(self) -> None:
+        self.assertEqual(bucket_position(10.0, 20.0, grid_size=48.0), (0, 0))
+        self.assertEqual(bucket_position(47.9, 47.9, grid_size=48.0), (0, 0))
+        self.assertEqual(bucket_position(48.0, 0.0, grid_size=48.0), (1, 0))
+        self.assertEqual(bucket_position(-1.0, -1.0, grid_size=48.0), (-1, -1))
+
+    def test_compute_exploration_bonus_rewards_new_cells_only_once(self) -> None:
+        visited: set[tuple[int, int]] = set()
+
+        first_visit = compute_exploration_bonus((0, 0), visited, bonus=0.02)
+        second_visit = compute_exploration_bonus((0, 0), visited, bonus=0.02)
+        new_cell_visit = compute_exploration_bonus((1, 0), visited, bonus=0.02)
+
+        self.assertEqual(first_visit, 0.02)
+        self.assertEqual(second_visit, 0.0)
+        self.assertEqual(new_cell_visit, 0.02)
+        self.assertEqual(visited, {(0, 0), (1, 0)})
+
+    def test_decayed_exploration_bonus_linearly_reduces_to_zero(self) -> None:
+        self.assertEqual(decayed_exploration_bonus(0.02, 0, 100), 0.02)
+        self.assertAlmostEqual(decayed_exploration_bonus(0.02, 50, 100), 0.01)
+        self.assertEqual(decayed_exploration_bonus(0.02, 100, 100), 0.0)
+        self.assertEqual(decayed_exploration_bonus(0.02, 200, 100), 0.0)
+
+    def test_decayed_exploration_bonus_disabled_stays_constant(self) -> None:
+        self.assertEqual(decayed_exploration_bonus(0.02, 500, 0), 0.02)
+
+    def test_environment_tracks_visited_cells_after_reset_when_exploration_bonus_enabled(
+        self,
+    ) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="my_way_home")
+        profile = replace(profile, exploration_bonus=0.02)
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            env.reset()
+            self.assertEqual(len(env.get_attr("_visited_cells")[0]), 1)
+        finally:
+            env.close()
+
+    def test_environment_does_not_track_visited_cells_when_exploration_bonus_disabled(
+        self,
+    ) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="my_way_home")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            env.reset()
+            self.assertEqual(len(env.get_attr("_visited_cells")[0]), 0)
+        finally:
+            env.close()
+
+    def test_predict_position_turn_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="predict_position")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                ("ATTACK", "TURN_LEFT+ATTACK", "TURN_RIGHT+ATTACK"),
+            )
+        finally:
+            env.close()
+
+    def test_deadly_corridor_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="deadly_corridor")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                (
+                    "ATTACK",
+                    "MOVE_FORWARD",
+                    "MOVE_FORWARD+ATTACK",
+                    "MOVE_BACKWARD",
+                    "TURN_LEFT",
+                    "TURN_RIGHT",
+                    "MOVE_LEFT",
+                    "MOVE_RIGHT",
+                ),
             )
         finally:
             env.close()

@@ -163,6 +163,9 @@ class TrainingProfile:
     reward_shaping: RewardShapingConfig = field(default_factory=RewardShapingConfig)
     early_stopping: EarlyStoppingConfig = field(default_factory=EarlyStoppingConfig)
     curriculum: tuple[CurriculumStageConfig, ...] = ()
+    exploration_bonus: float = 0.0
+    exploration_grid_size: float = 48.0
+    exploration_bonus_decay_steps: int = 0
 
     @property
     def effective_timesteps(self) -> int:
@@ -238,6 +241,15 @@ class TrainingProfile:
         if not 0 < self.gae_lambda <= 1:
             raise ValueError("'gae_lambda' debe estar entre 0 y 1.")
 
+        if self.exploration_bonus < 0:
+            raise ValueError("'exploration_bonus' no puede ser negativo.")
+
+        if self.exploration_grid_size <= 0:
+            raise ValueError("'exploration_grid_size' debe ser mayor que cero.")
+
+        if self.exploration_bonus_decay_steps < 0:
+            raise ValueError("'exploration_bonus_decay_steps' no puede ser negativo.")
+
         if self.action_space_kind not in {"button_combinations", "discrete", "multidiscrete"}:
             raise ValueError(
                 "'action_space_kind' debe ser 'button_combinations', 'discrete' o 'multidiscrete'."
@@ -250,6 +262,7 @@ class TrainingProfile:
 
         if self.action_combo_preset not in {
             "basic_combat",
+            "corridor_combat",
             "default",
             "health_navigation",
             "my_way_home_navigation",
@@ -257,7 +270,7 @@ class TrainingProfile:
             "turn_combat",
         }:
             raise ValueError(
-                "'action_combo_preset' debe ser 'basic_combat', 'default', "
+                "'action_combo_preset' debe ser 'basic_combat', 'corridor_combat', 'default', "
                 "'health_navigation', 'my_way_home_navigation', "
                 "'take_cover_dodge' o 'turn_combat'."
             )
@@ -306,6 +319,9 @@ class TrainingProfile:
             "reward_shaping": self.reward_shaping.to_dict(),
             "early_stopping": self.early_stopping.to_dict(),
             "curriculum": [stage.to_dict() for stage in self.curriculum],
+            "exploration_bonus": self.exploration_bonus,
+            "exploration_grid_size": self.exploration_grid_size,
+            "exploration_bonus_decay_steps": self.exploration_bonus_decay_steps,
             "effective_timesteps": self.effective_timesteps,
             "uses_rounded_timesteps": self.uses_rounded_timesteps,
         }
@@ -329,6 +345,9 @@ class TrainingProfile:
             "action_space_kind": self.action_space_kind,
             "action_combo_preset": self.action_combo_preset,
             "reward_shaping": self.reward_shaping.to_dict(),
+            "exploration_bonus": self.exploration_bonus,
+            "exploration_grid_size": self.exploration_grid_size,
+            "exploration_bonus_decay_steps": self.exploration_bonus_decay_steps,
         }
 
     def model_compatibility_signature(self) -> dict[str, object]:
@@ -404,4 +423,7 @@ class TrainingProfile:
             curriculum=tuple(
                 CurriculumStageConfig.from_dict(stage) for stage in payload.get("curriculum", [])
             ),
+            exploration_bonus=payload.get("exploration_bonus", 0.0),
+            exploration_grid_size=payload.get("exploration_grid_size", 48.0),
+            exploration_bonus_decay_steps=payload.get("exploration_bonus_decay_steps", 0),
         )
