@@ -195,3 +195,15 @@ Estado:
 `defend_the_line` sigue como cierre fuerte estable, sin necesidad de reentrenamiento.
 
 No hay una fase posterior al curriculum documentada mas alla de esto — el alcance del proyecto es entrenar el modelo `foundation` por escenario y mantener storage sincronizado, no hay plan de despliegue o integracion a partida completa.
+
+## Niveles completos de Doom original — investigado y descartado (2026-07-16)
+
+La documentacion oficial de ViZDoom (`environments/original_doom_levels/`) si define un paso natural mas alla de los 9 escenarios default: entrenar sobre niveles completos originales (`E1M1`, `MAP01`, etc.), usando `doom.cfg`/`doom2.cfg` o `freedoom1.cfg`/`freedoom2.cfg` (el proyecto ya usa `freedoom2.wad`, sin costo adicional).
+
+Investigado a fondo, descartado por alto riesgo:
+
+- action space de 13 botones (movimiento, giro, `ATTACK`, `SPEED`, `STRAFE`, `USE`, 7 armas + next/prev) — requeriria `MultiDiscrete`, no el sistema de combos actual
+- reward por defecto disperso total (`1` al terminar el nivel, `0` el resto); ViZDoom expone shaping nativo mas rico (`set_kill_reward`, `set_item_reward`, `set_secret_reward`, etc.) pero igual exige diseño nuevo
+- HUD completo + automap + audio por defecto, mapas grandes con puertas/switches/secretos, sin manejo nativo de campana multi-nivel
+
+**Motivo del descarte:** es la misma categoria de problema que ya fallo 5 veces en `my_way_home` (reward disperso + navegacion de mapa) pero mas dificil aun (accion mas grande, mapa mas grande, mas mecanicas). Mismo razonamiento que llevo a descartar `deathmatch`. No es un escenario mas del curriculum, es un proyecto de investigacion nuevo (probablemente necesitaria curiosity/ICM real). Decision explicita del usuario: no perseguir.
