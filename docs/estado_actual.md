@@ -19,8 +19,8 @@ Fecha base: 2026-07-14
 - baseline oficial: `basic`
 - ultimo escenario cerrado fuerte: `deadly_corridor`
 - ultimos escenarios especializados cerrados: `basic_audio`, `basic_notifications`
-- escenario siguiente exacto recomendado: ninguno, curriculum cerrado (2026-07-14); `deathmatch` descartado por complejidad, no se integra
-- estado operativo actual: `my_way_home` y `predict_position` quedaron pendientes definitivos (ambos con reward disperso, ninguno aprendio la habilidad objetivo); `health_gathering_supreme` y `deadly_corridor` cerrados oficiales
+- escenario siguiente exacto recomendado: ninguno, curriculum cerrado (2026-07-14); `deathmatch` descartado por complejidad; piloto de nivel real (`full_level_map01`) ejecutado y cerrado como pendiente definitivo (2026-07-16)
+- estado operativo actual: `my_way_home`, `predict_position` y `full_level_map01` quedaron pendientes definitivos; `health_gathering_supreme` y `deadly_corridor` cerrados oficiales
 - configuracion baseline: [configs/base.toml](/E:/agente-doom/configs/base.toml:1) + [configs/scenarios/basic.toml](/E:/agente-doom/configs/scenarios/basic.toml:1)
 - flujo principal: `make train`
 - flujo recomendado para escenario nuevo: `make train-from-scratch`
@@ -40,6 +40,7 @@ Fecha base: 2026-07-14
 - **bug de `resume_mode` corregido en codigo (2026-07-16)**: columna cambiada de `VARCHAR(80)` a `Text` sin limite en `src/doom_agent/persistence/models.py`. No hay Alembic configurado en el repo (tabla creada a mano en Neon); falta correr manualmente en la DB remota: `ALTER TABLE training_runs ALTER COLUMN resume_mode TYPE TEXT;` (seguro, solo ensancha, no toca datos existentes)
 - **bug critico corregido (2026-07-14)**: `make promote CHECKPOINT=...` sin `SCENARIO=` explicito sobrescribia el checkpoint promovido de `basic` en vez del escenario real que se estaba promoviendo; ver seccion `Incidente critico` mas abajo
 - **bug de codificacion corregido, sin ganancia (2026-07-15)**: `basic_audio`/`basic_notifications` codificaban su buffer auxiliar (PCM crudo / texto de notificacion) como canal de imagen falso (`cv2.resize`), destruyendo la señal. Fix real: `Dict` observation space (`image`+`features`) + `DoomMultiModalFeatureExtractor` + `MultiInputLstmPolicy`. Arquitectura confirmada correcta (`explained_variance` 0.9+), pero tras retrain from-scratch ninguno de los dos escenarios supero el baseline anterior — la varianza intrinseca del escenario (`std` 90-145 con 50 episodios) es demasiado grande para que la mejora de codificacion se refleje en el eval. Ninguno promovido, checkpoints oficiales sin cambios.
+- **piloto de nivel real de Doom ejecutado y cerrado (2026-07-16)**: tras aclarar que el objetivo real era un agente que juegue niveles reales (no 9 especialistas aislados), se integro `full_level_map01` (Freedoom 2 MAP01, preset `full_doom_basic`, reward shaping nativo de ViZDoom). Entrenamiento `from-scratch` de 1M steps: agente convergio a conducta pasiva (girar en circulo), `mean_reward` clavado en `-0.420`, nunca hubo kill/item/secreto/salida en 400 episodios evaluados. Causa: `living_reward` demasiado chico frente a `death_penalty`, incentiva evitar todo riesgo en vez de explorar. Pendiente definitivo, no promovido. Ver seccion "Niveles completos de Doom original" en `plan_escenarios.md` para el detalle completo.
 
 ## Reward shaping: intentado y descartado para my_way_home (2026-07-14)
 
@@ -87,6 +88,7 @@ Fecha base: 2026-07-14
 | `health_gathering_supreme` | Cerrado oficial | Bueno | `doom_foundation_agent__health_gathering_supreme_promoted.zip` | `mean_reward = 416.02`, `std = 85.45` | Transfer learning desde `health_gathering` (2.3M steps heredados + 301k adicionales). Reward denso, varianza relativa razonable. |
 | `deadly_corridor` | Cerrado oficial | Bueno | `doom_foundation_agent__deadly_corridor_promoted.zip` | `mean_reward = 43.62`, `std = 16.62` | Primer piloto `from-scratch`. Reward denso y positivo, sin colapso. `doom_skill=5`, muy dificil por diseño. |
 | `deathmatch` | Futuro | Pendiente | No aplica | No entrenado aun | Dejar al final; ultimo escenario oficial sin integrar. |
+| `full_level_map01` | Pendiente definitivo (piloto ejecutado) | Malo | No aplica | `mean_reward` clavado en `-0.420` (`std=0.000`), `mean_episode_length` clavado en `4200` (timeout maximo) en casi todas las 20 evaluaciones; mejor resultado temprano (`-0.129`, step 100000) nunca superado en 1M steps | Piloto de nivel real de Doom (Freedoom 2 MAP01, mas alla de los 9 escenarios curados). Agente convergio a conducta pasiva (girar en circulo) por reward mal balanceado (`living_reward=-0.0001` vs `death_penalty=1.0`). Nunca hubo kill/item/secreto/salida en 400 episodios evaluados. Arquitectura/pipeline correctos, problema es diseño de reward. No promovido. |
 
 ## Lectura operativa
 

@@ -210,4 +210,17 @@ Investigado a fondo, descartado por alto riesgo:
 - reward por defecto disperso total (`1` al terminar el nivel, `0` el resto); ViZDoom expone shaping nativo mas rico (`set_kill_reward`, `set_item_reward`, `set_secret_reward`, etc.) pero igual exige diseño nuevo
 - HUD completo + automap + audio por defecto, mapas grandes con puertas/switches/secretos, sin manejo nativo de campana multi-nivel
 
-**Motivo del descarte:** es la misma categoria de problema que ya fallo 5 veces en `my_way_home` (reward disperso + navegacion de mapa) pero mas dificil aun (accion mas grande, mapa mas grande, mas mecanicas). Mismo razonamiento que llevo a descartar `deathmatch`. No es un escenario mas del curriculum, es un proyecto de investigacion nuevo (probablemente necesitaria curiosity/ICM real). Decision explicita del usuario: no perseguir.
+**Motivo del descarte inicial:** es la misma categoria de problema que ya fallo 5 veces en `my_way_home` (reward disperso + navegacion de mapa) pero mas dificil aun (accion mas grande, mapa mas grande, mas mecanicas). Mismo razonamiento que llevo a descartar `deathmatch`. No es un escenario mas del curriculum, es un proyecto de investigacion nuevo (probablemente necesitaria curiosity/ICM real).
+
+### Piloto ejecutado y cerrado (2026-07-16)
+
+Tras aclarar que el objetivo real del proyecto era un agente que juegue niveles reales (no 9 especialistas aislados), se retomo la idea y se ejecuto un piloto real: escenario `full_level_map01` (Freedoom 2 MAP01, `freedoom2.wad` ya incluido en el proyecto), preset nuevo `full_doom_basic` (10 acciones sobre 9 botones), reward shaping nativo de ViZDoom (`kill_reward=1.0`, `item_reward=0.1`, `secret_reward=0.2`, `living_reward=-0.0001`, `death_penalty=1.0`, `map_exit_reward=5.0`), `episode_timeout=4200` tics. Arquitectura reutilizada sin cambios (misma `DoomFeatureExtractor`/`CnnLstmPolicy` que los 9 escenarios cerrados). Validado antes de la corrida grande: se encontro y corrigio un bug real de `reward_shaping.clip_max` que hubiera recortado el `map_exit_reward` a 1/5 de su valor.
+
+**Entrenamiento `from-scratch`, 1M steps (2026-07-16), resultado segun los criterios fijados antes de arrancar:**
+- `eval/mean_reward`: sin tendencia. Mejor resultado temprano (step 100000: `-0.129`), nunca superado en los 900k steps restantes. Mayoria de evaluaciones clavadas en `-0.420` con `std_reward=0.000` (mismo resultado exacto en las 20 episodios).
+- `mean_episode_length`: clavado en `4200` (el timeout maximo) en casi todas las evaluaciones — no se aleja del techo.
+- `map_exit_reward`: nunca se activo ninguna señal de kill/item/secreto/salida en ninguna de las 400 evaluaciones episodicas totales del entrenamiento.
+
+**Causa raiz identificada:** el agente convergio a una conducta pasiva degenerada (girar en circulo sin enfrentar nada — acciones dominantes finales `TURN_LEFT`+`MOVE_LEFT` al 25-29% cada una). Con `living_reward=-0.0001` tan chico frente a `death_penalty=1.0`, la politica optima "segura" es evitar todo riesgo y esperar el timeout en vez de explorar/atacar. Problema de diseño de reward, no de arquitectura ni de pipeline.
+
+**Cierre:** pendiente definitivo, mismo trato que `my_way_home`/`predict_position`. No promovido. Decision explicita del usuario de no reintentar con reward corregido por ahora — documentado para retomar si se decide invertir en un segundo intento (ajustar balance `living_reward`/`death_penalty` para incentivar exploracion).
