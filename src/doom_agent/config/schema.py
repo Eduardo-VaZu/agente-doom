@@ -264,6 +264,7 @@ class TrainingProfile:
             "basic_combat",
             "corridor_combat",
             "default",
+            "full_doom_basic",
             "health_navigation",
             "my_way_home_navigation",
             "take_cover_dodge",
@@ -271,7 +272,7 @@ class TrainingProfile:
         }:
             raise ValueError(
                 "'action_combo_preset' debe ser 'basic_combat', 'corridor_combat', 'default', "
-                "'health_navigation', 'my_way_home_navigation', "
+                "'full_doom_basic', 'health_navigation', 'my_way_home_navigation', "
                 "'take_cover_dodge' o 'turn_combat'."
             )
 

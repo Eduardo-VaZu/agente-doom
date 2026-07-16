@@ -1,0 +1,23 @@
+[scenario]
+scenario_name = "full_level_map01.cfg"
+description = "Piloto: nivel completo real de Freedoom 2 (MAP01), no mini-escenario curado."
+learning_rate = 0.0001
+n_steps = 2048
+batch_size = 128
+n_epochs = 4
+gamma = 0.99
+gae_lambda = 0.95
+ent_coef = 0.01
+requested_timesteps = 1000000
+checkpoint_frequency = 50000
+eval_frequency = 50000
+eval_episodes = 20
+video_record_frequency = 200000
+video_length = 1000
+action_combo_preset = "full_doom_basic"
+
+[scenario.reward_shaping]
+scale = 1.0
+offset = 0.0
+clip_min = -1.0
+clip_max = 1.0

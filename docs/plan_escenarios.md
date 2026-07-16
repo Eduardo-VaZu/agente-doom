@@ -196,7 +196,11 @@ Estado:
 
 No hay una fase posterior al curriculum documentada mas alla de esto — el alcance del proyecto es entrenar el modelo `foundation` por escenario y mantener storage sincronizado, no hay plan de despliegue o integracion a partida completa.
 
-## Niveles completos de Doom original — investigado y descartado (2026-07-16)
+## Niveles completos de Doom original — retomado (2026-07-16)
+
+**Actualizacion:** tras aclarar que el objetivo real del proyecto es un agente que juegue niveles reales de Doom (no 9 especialistas aislados), el usuario confirmo que si quiere perseguir esto. La seccion original de "descartado" queda como registro de la primera decision (antes de aclarar el objetivo real), no como estado final. Ver seccion siguiente para el plan de implementacion.
+
+### Primer analisis (antes de la aclaracion de objetivo)
 
 La documentacion oficial de ViZDoom (`environments/original_doom_levels/`) si define un paso natural mas alla de los 9 escenarios default: entrenar sobre niveles completos originales (`E1M1`, `MAP01`, etc.), usando `doom.cfg`/`doom2.cfg` o `freedoom1.cfg`/`freedoom2.cfg` (el proyecto ya usa `freedoom2.wad`, sin costo adicional).
 

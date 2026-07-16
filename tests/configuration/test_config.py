@@ -49,6 +49,7 @@ class TrainingProfileTests(unittest.TestCase):
                 "deadly_corridor",
                 "defend_the_center",
                 "defend_the_line",
+                "full_level_map01",
                 "health_gathering",
                 "health_gathering_supreme",
                 "my_way_home",
@@ -193,6 +194,15 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual(profile.scenario_name, "deadly_corridor.cfg")
         self.assertEqual(profile.action_combo_preset, "corridor_combat")
         self.assertEqual(profile.requested_timesteps, 300000)
+        self.assertEqual(profile.eval_episodes, 20)
+        self.assertEqual(profile.reward_shaping.clip_min, -1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+
+    def test_full_level_map01_scenario_uses_full_doom_basic_profile(self) -> None:
+        profile = get_training_profile("default", scenario_name="full_level_map01")
+        self.assertEqual(profile.scenario_name, "full_level_map01.cfg")
+        self.assertEqual(profile.action_combo_preset, "full_doom_basic")
+        self.assertEqual(profile.requested_timesteps, 1000000)
         self.assertEqual(profile.eval_episodes, 20)
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)
         self.assertEqual(profile.reward_shaping.clip_max, 1.0)

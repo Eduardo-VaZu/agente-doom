@@ -127,6 +127,40 @@ class EnvironmentSmokeTests(unittest.TestCase):
             ),
         )
 
+    def test_full_doom_basic_actions_cover_navigation_use_and_weapon_cycle(self) -> None:
+        labels, actions = build_button_combination_actions(
+            (
+                "ATTACK",
+                "USE",
+                "MOVE_RIGHT",
+                "MOVE_LEFT",
+                "MOVE_BACKWARD",
+                "MOVE_FORWARD",
+                "TURN_RIGHT",
+                "TURN_LEFT",
+                "SELECT_NEXT_WEAPON",
+            ),
+            preset="full_doom_basic",
+        )
+        readable_labels = tuple("+".join(label) for label in labels)
+
+        self.assertEqual(len(actions), 10)
+        self.assertEqual(
+            readable_labels,
+            (
+                "ATTACK",
+                "MOVE_FORWARD",
+                "MOVE_FORWARD+ATTACK",
+                "MOVE_BACKWARD",
+                "TURN_LEFT",
+                "TURN_RIGHT",
+                "MOVE_LEFT",
+                "MOVE_RIGHT",
+                "USE",
+                "SELECT_NEXT_WEAPON",
+            ),
+        )
+
     def test_turn_combat_actions_only_include_attack_actions(self) -> None:
         labels, actions = build_button_combination_actions(
             ("TURN_LEFT", "TURN_RIGHT", "ATTACK"),
@@ -422,6 +456,43 @@ class EnvironmentSmokeTests(unittest.TestCase):
                     "TURN_RIGHT",
                     "MOVE_LEFT",
                     "MOVE_RIGHT",
+                ),
+            )
+        finally:
+            env.close()
+
+    def test_full_level_map01_preset_matches_available_buttons(self) -> None:
+        project_paths = build_project_paths()
+        profile = get_training_profile("default", scenario_name="full_level_map01")
+        env = make_vectorized_env(profile, project_paths)
+        try:
+            self.assertEqual(
+                env.get_attr("available_button_names")[0],
+                (
+                    "ATTACK",
+                    "USE",
+                    "MOVE_RIGHT",
+                    "MOVE_LEFT",
+                    "MOVE_BACKWARD",
+                    "MOVE_FORWARD",
+                    "TURN_RIGHT",
+                    "TURN_LEFT",
+                    "SELECT_NEXT_WEAPON",
+                ),
+            )
+            self.assertEqual(
+                env.get_attr("action_labels")[0],
+                (
+                    "ATTACK",
+                    "MOVE_FORWARD",
+                    "MOVE_FORWARD+ATTACK",
+                    "MOVE_BACKWARD",
+                    "TURN_LEFT",
+                    "TURN_RIGHT",
+                    "MOVE_LEFT",
+                    "MOVE_RIGHT",
+                    "USE",
+                    "SELECT_NEXT_WEAPON",
                 ),
             )
         finally:

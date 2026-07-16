@@ -201,6 +201,19 @@ def build_button_combination_actions(
         add_action(("MOVE_RIGHT",))
         return tuple(labels), tuple(actions)
 
+    if preset == "full_doom_basic":
+        add_action(("ATTACK",))
+        add_action(("MOVE_FORWARD",))
+        add_action(("MOVE_FORWARD", "ATTACK"))
+        add_action(("MOVE_BACKWARD",))
+        add_action(("TURN_LEFT",))
+        add_action(("TURN_RIGHT",))
+        add_action(("MOVE_LEFT",))
+        add_action(("MOVE_RIGHT",))
+        add_action(("USE",))
+        add_action(("SELECT_NEXT_WEAPON",))
+        return tuple(labels), tuple(actions)
+
     actions.append(np.zeros(len(available_button_names), dtype=np.int32))
     labels.append(("NOOP",))
 
