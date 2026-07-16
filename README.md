@@ -250,10 +250,12 @@ considera `report.json`, `manifest.json`, checkpoints y videos elegibles.
 
 - modelo activo: `foundation`
 - baseline oficial: `basic`
-- ultimo escenario fuerte cerrado: `defend_the_line`
-- escenarios especializados cerrados: `basic_audio`, `basic_notifications`
-- siguiente escenario exacto recomendado: `my_way_home`
-- fase entrenamiento: `Fase 3`
+- curriculum cerrado (2026-07-14): 9 escenarios oficiales de ViZDoom cerrados (7 fuerte + 2 provisional); `deathmatch` descartado por complejidad, no se integra
+- ultimo escenario fuerte cerrado: `deadly_corridor`
+- escenarios especializados cerrados: `basic_audio`, `basic_notifications` (arquitectura de observacion corregida 2026-07-15, sin ganancia medible por varianza intrinseca del escenario)
+- `my_way_home` y `predict_position`: pendientes definitivos, no bloquean nada
+- siguiente escenario recomendado: ninguno, no hay escenarios pendientes
+- fase entrenamiento: `Fase 4`
 - fase storage: `Fase 2`
 - flujo principal: `make train`
 

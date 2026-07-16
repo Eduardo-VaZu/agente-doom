@@ -183,25 +183,15 @@ Estado:
 2. `my_way_home` y `predict_position` quedan pendientes definitivos; no bloquean nada
 3. pasar siempre `SCENARIO=` explicito en `make promote` hasta ganar mas confianza en el fix del bug critico
 
-## Post-curriculum
+## Post-curriculum (cerrado, 2026-07-15/16)
 
-Cuando termine el bloque actual de escenarios pendientes, el orden recomendado de reentrenamiento es:
+`basic_audio` y `basic_notifications` ya se reabrieron post-curriculum, dos veces:
 
-1. `basic_audio`
-2. `basic_notifications`
-3. `defend_the_line`, solo si se necesita una version mas fuerte
+1. **Intento 1** (misma config, +301k steps c/u): ambos empeoraron. Confirmo que mas steps solos no alcanza.
+2. **Intento 2** (fix real de arquitectura): se encontro un bug real — el buffer auxiliar (audio PCM crudo / texto de notificacion) se codificaba como canal de imagen falso via `cv2.resize`, destruyendo la señal. Fix: `Dict` observation space (`image`+`features`) + `DoomMultiModalFeatureExtractor` + `MultiInputLstmPolicy` (ver `src/doom_agent/envs/doom_env.py`, `src/doom_agent/models/recurrent_ppo.py`). Retrain from-scratch con arquitectura correcta (`explained_variance` 0.9-0.99): tampoco supero el baseline (`basic_audio` mejor resultado formal `-73.04` vs `-64.84`; `basic_notifications` `-110.84` vs `-73.60`).
 
-`my_way_home` ya no esta en esta lista: su reward shaping ya esta implementado, el reintento es la siguiente accion inmediata, no un post-curriculum. `predict_position` tampoco esta en esta lista: bloqueo tecnico sin solucion conocida, no una cuestion de prioridad.
+**Conclusion:** la varianza intrinseca de ambos escenarios (`std_reward` 90-145 con 50 episodios) es demasiado grande para que cualquier mejora de politica se refleje en el eval. Quedan cerrados provisional tal cual, sin mas reaperturas previstas — mismo estado que `my_way_home`/`predict_position`: pendientes definitivos, no por falta de esfuerzo.
 
-Objetivo de esas reaperturas:
+`defend_the_line` sigue como cierre fuerte estable, sin necesidad de reentrenamiento.
 
-- convertir escenarios provisionales en referencias oficiales fuertes
-- probar una `v2` de configuracion sin tocar checkpoints ya promovidos
-- medir si la mejora viene de hyperparams o si ya hace falta cambiar representacion/arquitectura
-
-Criterio para considerar una `v2` exitosa:
-
-- supera checkpoint promovido vigente en evaluacion offline de `50` episodios
-- reduce sesgo de acciones dominante
-- no se degrada tanto entre `best_model.zip` y `final_model.zip`
-- deja una narrativa mas fuerte para presentacion y cierre del proyecto
+No hay una fase posterior al curriculum documentada mas alla de esto — el alcance del proyecto es entrenar el modelo `foundation` por escenario y mantener storage sincronizado, no hay plan de despliegue o integracion a partida completa.
