@@ -60,7 +60,7 @@ class TrainingRun(TimestampedModel, Base):
     completed: Mapped[bool] = mapped_column(BOOLEAN, nullable=False)
     stopped_early: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, default=False)
     stop_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    resume_mode: Mapped[str] = mapped_column(String(80), nullable=False)
+    resume_mode: Mapped[str] = mapped_column(Text, nullable=False)
     resume_source: Mapped[str | None] = mapped_column(Text, nullable=True)
     resume_saved_timesteps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     evaluation_metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
