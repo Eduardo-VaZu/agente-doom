@@ -17,6 +17,7 @@ from doom_agent.utils.checkpoints import (
     promoted_checkpoint_stem,
     update_checkpoint_metadata,
 )
+from doom_agent.utils.console import print_block
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,10 +86,15 @@ def promote_checkpoint(
         )
         if project_paths.root_dir.exists():
             publish_local_workspace_state(root_dir=project_paths.root_dir)
-    except ValueError:
-        pass
-    except Exception:
-        pass
+    except Exception as error:
+        print_block(
+            "Workspace Handoff Warning",
+            [
+                "No se pudo publicar estado compartido de handoff tras promover.",
+                f"error={type(error).__name__}: {error}",
+                "Checkpoint promovido local sigue disponible.",
+            ],
+        )
 
     return PromotionResult(
         source_checkpoint_path=source_checkpoint_path,
