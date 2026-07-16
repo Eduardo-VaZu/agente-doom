@@ -20,4 +20,4 @@ action_combo_preset = "full_doom_basic"
 scale = 1.0
 offset = 0.0
 clip_min = -1.0
-clip_max = 1.0
+clip_max = 5.0

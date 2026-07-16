@@ -205,7 +205,7 @@ class TrainingProfileTests(unittest.TestCase):
         self.assertEqual(profile.requested_timesteps, 1000000)
         self.assertEqual(profile.eval_episodes, 20)
         self.assertEqual(profile.reward_shaping.clip_min, -1.0)
-        self.assertEqual(profile.reward_shaping.clip_max, 1.0)
+        self.assertEqual(profile.reward_shaping.clip_max, 5.0)
 
     def test_health_gathering_supreme_scenario_uses_navigation_profile(self) -> None:
         profile = get_training_profile("default", scenario_name="health_gathering_supreme")
