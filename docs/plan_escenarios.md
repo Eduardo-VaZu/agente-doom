@@ -223,4 +223,18 @@ Tras aclarar que el objetivo real del proyecto era un agente que juegue niveles 
 
 **Causa raiz identificada:** el agente convergio a una conducta pasiva degenerada (girar en circulo sin enfrentar nada — acciones dominantes finales `TURN_LEFT`+`MOVE_LEFT` al 25-29% cada una). Con `living_reward=-0.0001` tan chico frente a `death_penalty=1.0`, la politica optima "segura" es evitar todo riesgo y esperar el timeout en vez de explorar/atacar. Problema de diseño de reward, no de arquitectura ni de pipeline.
 
-**Cierre:** pendiente definitivo, mismo trato que `my_way_home`/`predict_position`. No promovido. Decision explicita del usuario de no reintentar con reward corregido por ahora — documentado para retomar si se decide invertir en un segundo intento (ajustar balance `living_reward`/`death_penalty` para incentivar exploracion).
+**Cierre intento 1:** pendiente definitivo, mismo trato que `my_way_home`/`predict_position`. No promovido.
+
+### Segundo intento: reward rebalanceado (2026-07-16)
+
+Fix de una linea en `.cfg`: `living_reward` de `-0.0001` a `-0.001` (10x), `death_penalty` de `1.0` a `0.3`. Nuevo balance: idle hasta timeout cuesta `-4.2` (antes `-0.42`), morir cuesta `-0.3` (antes `-1.0`) — girar en circulo deja de ser la opcion "segura".
+
+**Entrenamiento `from-scratch`, 1M steps (2026-07-16):**
+- Comportamiento cambio: acciones dominantes ya no fijas en `TURN_LEFT`/`MOVE_LEFT` al 90%+; el agente ataca, usa puertas, distribucion de acciones mas pareja (dominante entre 15-30% segun evaluacion).
+- `eval/mean_reward` oscilo sin converger: `-4.2 -3.44 -4.2 -1.82 -4.18 -2.82 -2.52 -2.35 -2.2 -1.58 -3.73 -2.45 -3.06 -2.69 -3.4 -4.2` a lo largo de las 20 evaluaciones. Mejor resultado `-1.584` en step 750000 (nuevo best_model), pero nunca se consolido.
+- Eval final (step 1000000): volvio a `-4.200`/`mean_length=4200` — colapso completo al timeout, igual que el intento 1.
+- `map_exit_reward`: sin señal en ninguna evaluacion, en ningun intento.
+
+**Causa probable:** rebalance de reward si rompio el optimo pasivo puro, pero el problema de fondo (mapa real grande, horizonte largo, reward todavia relativamente disperso frente a la dificultad de navegar/combatir) sigue sin resolverse con 1M steps y esta arquitectura. Entra en la misma categoria que `my_way_home`: necesitaria presupuesto mucho mayor o curiosity/ICM real para progresar mas alla de este punto.
+
+**Cierre definitivo (segundo intento):** pendiente definitivo, mismo trato que `my_way_home`/`predict_position`. No promovido. No reintentar sin pedido explicito del usuario — proximo paso razonable seria presupuesto 5-10x mayor o mecanismo de exploracion nuevo, no otro ajuste de una linea.
