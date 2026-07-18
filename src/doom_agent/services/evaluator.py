@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import cast
@@ -30,6 +31,8 @@ from doom_agent.utils.checkpoints import (
     resolve_checkpoint_preference,
 )
 from doom_agent.utils.console import print_kv_block
+
+DEMO_STEP_DELAY_SECONDS = 0.5
 
 
 def infer_legacy_profile(checkpoint_stem: Path) -> TrainingProfile:
@@ -185,6 +188,7 @@ def evaluate(
             episode_starts = dones
             if profile.render:
                 env.render()
+                time.sleep(DEMO_STEP_DELAY_SECONDS)
             step_count += 1
         print(f"Evaluacion completada: {step_count} pasos ejecutados.")
     except KeyboardInterrupt:

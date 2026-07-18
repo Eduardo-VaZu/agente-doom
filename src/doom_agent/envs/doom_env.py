@@ -36,12 +36,15 @@ def normalize_rgb_frame(frame: np.ndarray) -> np.ndarray:
     return frame
 
 
+# Preprocesa un cuadro crudo de ViZDoom para que lo consuma la CNN.
+# Pasos: ordenar canales -> pasar a gris -> reescalar a (width, height) -> enteros uint8.
 def preprocess_frame(frame: np.ndarray, width: int, height: int) -> Observation:
-    frame = normalize_rgb_frame(frame)
+    frame = normalize_rgb_frame(frame)  # asegura formato (alto, ancho, canales)
     if frame.ndim == 3 and frame.shape[-1] == 3:
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)  # color -> gris (menos datos)
 
-    resized = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+    resized = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)  # a 84x84
+    # Forma final (1, alto, ancho) y uint8 (0-255) para ahorrar memoria.
     return resized.reshape(1, height, width).astype(np.uint8)
 
 
@@ -129,17 +132,22 @@ def decayed_exploration_bonus(
     return base_bonus * (1.0 - progress)
 
 
+# Construye el conjunto de acciones discretas del agente a partir de combos de botones curados.
+# Cada preset define que combinaciones tienen sentido para un tipo de escenario.
+# Devuelve (etiquetas legibles, vectores binarios de botones) que consume el action space.
 def build_button_combination_actions(
     available_button_names: tuple[str, ...],
     preset: str = "default",
 ) -> tuple[tuple[tuple[str, ...], ...], tuple[BinaryAction, ...]]:
     actions: list[BinaryAction] = []
     labels: list[tuple[str, ...]] = []
+    # Mapa nombre-de-boton -> indice, para saber que posicion prender en el vector.
     button_index = {button_name: index for index, button_name in enumerate(available_button_names)}
 
+    # Helper: agrega una accion (combo de botones) al conjunto, filtrando invalidas y repetidas.
     def add_action(selected_buttons: tuple[str, ...]) -> None:
         missing_buttons = set(selected_buttons) - set(button_index)
-        if missing_buttons:
+        if missing_buttons:  # el preset pidio un boton que este escenario no tiene
             raise ValueError(
                 "El preset de acciones requiere botones no disponibles: "
                 f"{', '.join(sorted(missing_buttons))}."
@@ -147,14 +155,15 @@ def build_button_combination_actions(
 
         selected_button_set = set(selected_buttons)
         if has_opposing_buttons(selected_button_set):
-            return
+            return  # descarta combos contradictorios (IZQ+DER, ADELANTE+ATRAS, etc.)
 
+        # Codifica el combo como vector binario: 1 = boton presionado, 0 = suelto.
         encoded_action = np.zeros(len(available_button_names), dtype=np.int32)
         for selected_button in selected_buttons:
             encoded_action[button_index[selected_button]] = 1
 
         if any(np.array_equal(encoded_action, existing_action) for existing_action in actions):
-            return
+            return  # evita duplicados
 
         actions.append(encoded_action)
         labels.append(selected_buttons)
@@ -201,17 +210,19 @@ def build_button_combination_actions(
         add_action(("MOVE_RIGHT",))
         return tuple(labels), tuple(actions)
 
+    # Preset para niveles reales completos de Doom: incluye moverse, girar, disparar,
+    # avanzar disparando, abrir puertas (USE) y cambiar de arma.
     if preset == "full_doom_basic":
-        add_action(("ATTACK",))
-        add_action(("MOVE_FORWARD",))
-        add_action(("MOVE_FORWARD", "ATTACK"))
-        add_action(("MOVE_BACKWARD",))
-        add_action(("TURN_LEFT",))
-        add_action(("TURN_RIGHT",))
-        add_action(("MOVE_LEFT",))
-        add_action(("MOVE_RIGHT",))
-        add_action(("USE",))
-        add_action(("SELECT_NEXT_WEAPON",))
+        add_action(("ATTACK",))  # disparar
+        add_action(("MOVE_FORWARD",))  # avanzar
+        add_action(("MOVE_FORWARD", "ATTACK"))  # avanzar disparando
+        add_action(("MOVE_BACKWARD",))  # retroceder
+        add_action(("TURN_LEFT",))  # girar izquierda
+        add_action(("TURN_RIGHT",))  # girar derecha
+        add_action(("MOVE_LEFT",))  # desplazarse a la izquierda
+        add_action(("MOVE_RIGHT",))  # desplazarse a la derecha
+        add_action(("USE",))  # abrir puertas / activar interruptores
+        add_action(("SELECT_NEXT_WEAPON",))  # cambiar de arma
         return tuple(labels), tuple(actions)
 
     actions.append(np.zeros(len(available_button_names), dtype=np.int32))
@@ -228,6 +239,8 @@ def build_button_combination_actions(
     return tuple(labels), tuple(actions)
 
 
+# Entorno Gymnasium que envuelve un juego ViZDoom. Define que ve el agente (observation_space),
+# que puede hacer (action_space) y como avanza el juego (step/reset).
 class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 35}
 
@@ -267,7 +280,9 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
         self.action_definitions: tuple[BinaryAction, ...] = ()
         self.action_space: gym.Space[Any]
 
+        # Define el ESPACIO DE ACCIONES segun el tipo configurado:
         if self.action_space_kind == "button_combinations":
+            # Combos curados: el agente elige 1 entre N combos predefinidos (Discrete).
             labels, actions = build_button_combination_actions(
                 self.available_button_names,
                 preset=self.action_combo_preset,
@@ -276,12 +291,16 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
             self.action_definitions = actions
             self.action_space = gym.spaces.Discrete(len(self.action_definitions))
         elif self.action_space_kind == "multidiscrete":
+            # Cada boton independiente (mas libre, mas dificil de aprender).
             self.action_space = gym.spaces.MultiDiscrete(
                 np.full(self.button_count, 2, dtype=np.int64)
             )
         else:
+            # Discreto simple: un boton por accion.
             self.action_space = gym.spaces.Discrete(self.button_count)
+        # Define el ESPACIO DE OBSERVACIONES (lo que ve el agente):
         if self.observation_mode in {"vision_audio", "vision_notifications"}:
+            # Modo multimodal: imagen + un vector de features (audio o notificaciones).
             self.observation_space = gym.spaces.Dict(
                 {
                     "image": gym.spaces.Box(
@@ -299,6 +318,7 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
                 }
             )
         else:
+            # Modo vision pura: solo la imagen en escala de grises.
             self.observation_space = gym.spaces.Box(
                 low=0,
                 high=255,
@@ -310,9 +330,12 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
         self,
         action: AgentAction,
     ) -> tuple[Observation | DictObservation, float, bool, bool, dict[str, object]]:
+        # Traduce la accion del agente (indice o vector) al vector de botones que espera ViZDoom.
         binary_action = self._normalize_action(action)
+        # Ejecuta la accion en el juego; ViZDoom devuelve la recompensa nativa de este paso.
         raw_reward = float(self.game.make_action(binary_action.tolist()))
         self._elapsed_steps += 1
+        # Bonus de exploracion: premia pisar celdas nuevas del mapa (se desvanece con el tiempo).
         if self.exploration_bonus > 0 and not self.game.is_episode_finished():
             current_bonus = decayed_exploration_bonus(
                 self.exploration_bonus, self._elapsed_steps, self.exploration_bonus_decay_steps
@@ -321,11 +344,12 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
                 raw_reward += compute_exploration_bonus(
                     self._current_cell(), self._visited_cells, current_bonus
                 )
-        reward = self.reward_shaper.apply(raw_reward)
+        reward = self.reward_shaper.apply(raw_reward)  # aplica escala/recorte a la recompensa
         state = self.game.get_state()
-        terminated = self.game.is_episode_finished()
-        truncated = False
-        observation = self._observation_from_state(state)
+        terminated = self.game.is_episode_finished()  # True si el episodio termino (muerte/salida)
+        truncated = False  # este entorno no corta episodios por tiempo maximo
+        observation = self._observation_from_state(state)  # arma la observacion del nuevo estado
+        # info devuelve tanto la recompensa cruda como la ya transformada (util para depurar).
         info: dict[str, object] = {"raw_reward": raw_reward, "shaped_reward": reward}
         if self.action_space_kind == "button_combinations":
             action_index = int(np.asarray(action).item())
@@ -339,12 +363,12 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
         options: dict[str, object] | None = None,
     ) -> tuple[Observation | DictObservation, dict[str, object]]:
         super().reset(seed=seed)
-        self.game.new_episode()
-        self._visited_cells.clear()
+        self.game.new_episode()  # arranca un episodio nuevo en ViZDoom
+        self._visited_cells.clear()  # olvida las celdas visitadas del episodio anterior
         if self.exploration_bonus > 0:
-            self._visited_cells.add(self._current_cell())
+            self._visited_cells.add(self._current_cell())  # marca la celda inicial
         state = self.game.get_state()
-        return self._observation_from_state(state), {}
+        return self._observation_from_state(state), {}  # observacion inicial + info vacia
 
     def _current_cell(self) -> tuple[int, int]:
         x = self.game.get_game_variable(zd.GameVariable.POSITION_X)
@@ -360,8 +384,10 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
     def close(self) -> None:
         self.game.close()
 
+    # Traduce la accion que emite el agente al vector binario de botones que espera ViZDoom.
     def _normalize_action(self, action: AgentAction) -> BinaryAction:
         if self.action_space_kind == "button_combinations":
+            # El agente da un indice; lo mapeamos al combo de botones predefinido.
             action_index = int(np.asarray(action).item())
             if action_index < 0 or action_index >= len(self.action_definitions):
                 raise ValueError(
@@ -386,9 +412,11 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
             )
         return np.clip(normalized_action, 0, 1)
 
+    # Convierte el estado crudo de ViZDoom en la observacion que consume la red.
     def _observation_from_state(
         self, state: zd.GameState | None
     ) -> Observation | DictObservation:
+        # Preprocesa la imagen; si no hay estado (episodio terminado) usa un cuadro en negro.
         image = (
             preprocess_frame(
                 state.screen_buffer,
@@ -398,6 +426,7 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
             if state is not None
             else np.zeros((1, self.observation_height, self.observation_width), dtype=np.uint8)
         )
+        # Segun el modo, adjunta features de audio o de notificaciones (o solo imagen).
         if self.observation_mode == "vision_audio":
             audio_buffer = getattr(state, "audio_buffer", None) if state is not None else None
             return {"image": image, "features": extract_audio_features(audio_buffer)}
@@ -409,14 +438,15 @@ class DoomEnv(gym.Env[Observation | DictObservation, AgentAction]):
         return image
 
 
+# Crea e inicializa el juego ViZDoom a partir de la config del escenario.
 def build_doom_game(profile: TrainingProfile, project_paths: ProjectPaths) -> zd.DoomGame:
     scenario_path = profile.scenario_path(project_paths)
     game = zd.DoomGame()
-    game.load_config(str(Path(scenario_path)))
-    game.set_seed(profile.seed)
-    game.set_window_visible(profile.render)
-    game.set_screen_format(zd.ScreenFormat.RGB24)
-    game.set_screen_resolution(zd.ScreenResolution.RES_320X240)
+    game.load_config(str(Path(scenario_path)))  # carga el .cfg (mapa, botones, reward)
+    game.set_seed(profile.seed)  # semilla para reproducibilidad
+    game.set_window_visible(profile.render)  # muestra ventana solo si render=True
+    game.set_screen_format(zd.ScreenFormat.RGB24)  # formato de la imagen cruda
+    game.set_screen_resolution(zd.ScreenResolution.RES_320X240)  # resolucion nativa
     game.init()
     return game
 
@@ -447,9 +477,9 @@ def make_vectorized_env(
             exploration_bonus_decay_steps=profile.exploration_bonus_decay_steps,
         )
 
-    env: VecEnv = DummyVecEnv([_build_env])
-    env = VecMonitor(env)
-    env = VecFrameStack(env, n_stack=profile.frame_stack)
+    env: VecEnv = DummyVecEnv([_build_env])  # SB3 espera un entorno "vectorizado" aunque sea 1 solo
+    env = VecMonitor(env)  # registra recompensa y duracion de cada episodio
+    env = VecFrameStack(env, n_stack=profile.frame_stack)  # APILA los N cuadros (movimiento)
 
     if profile.record_video:
         resolved_video_dir = project_paths.videos_dir if video_dir is None else video_dir

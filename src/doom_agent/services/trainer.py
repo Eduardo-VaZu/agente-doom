@@ -330,11 +330,14 @@ def train_profile(
             run_artifacts.videos_dir,
         ]
     )
+    # Entorno de ENTRENAMIENTO (donde el agente juega y aprende).
     env = make_vectorized_env(profile, project_paths, video_dir=run_artifacts.videos_dir)
     env.seed(profile.seed)
+    # Entorno de EVALUACION separado, con otra semilla, para medir sin contaminar el entrenamiento.
     eval_profile = profile.for_evaluation(render=False).with_seed(profile.seed + 1)
     eval_env = make_vectorized_env(eval_profile, project_paths)
     eval_env.seed(eval_profile.seed)
+    # Crea el modelo desde cero, o lo carga desde un checkpoint si estamos continuando una corrida.
     model = load_training_model(env, profile, run_artifacts.tensorboard_dir, resume_state)
     callback = PeriodicTrainingCallback(
         run_id=run_id,
@@ -360,11 +363,13 @@ def train_profile(
     completed = False
     training_status = "interrupted"
     try:
+        # AQUI OCURRE TODO EL ENTRENAMIENTO: rollouts -> BPTT -> GAE -> perdida PPO -> update,
+        # repetido hasta total_timesteps. El callback corre en medio (evalua y guarda checkpoints).
         model.learn(
             total_timesteps=profile.effective_timesteps,
             tb_log_name=profile.tensorboard_run_name,
             callback=callback,
-            reset_num_timesteps=not resume_state.is_resumed,
+            reset_num_timesteps=not resume_state.is_resumed,  # no reinicia contador si continuamos
         )
         completed = True
         training_status = "completed"
@@ -543,6 +548,8 @@ def train(
         scenario_name=scenario_name,
         seed=seed,
     )
+    # Si el perfil es un CURRICULUM, se entrenan varias etapas en secuencia,
+    # y cada etapa arranca desde el modelo de la anterior (dificultad creciente).
     if profile.curriculum:
         if scenario_name is not None:
             raise ValueError(

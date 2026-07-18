@@ -52,6 +52,7 @@ def _next_multiple(current_timesteps: int, frequency: int) -> int:
     return ((current_timesteps // frequency) + 1) * frequency
 
 
+# Devuelve el modelo listo para entrenar: nuevo desde cero, o cargado desde un checkpoint.
 def load_training_model(
     env: VecEnv,
     profile: TrainingProfile,
@@ -59,8 +60,10 @@ def load_training_model(
     resume_state: ResumeState,
 ) -> RecurrentPPO:
     if not resume_state.is_resumed:
+        # Sin checkpoint previo: construye un RecurrentPPO nuevo con los hiperparametros del perfil.
         return build_recurrent_ppo_model(env, profile, str(tensorboard_dir))
 
+    # Con checkpoint: carga los pesos guardados para CONTINUAR el entrenamiento donde quedo.
     assert resume_state.checkpoint is not None
     model = RecurrentPPO.load(
         str(checkpoint_zip_path(resume_state.checkpoint.checkpoint_stem)),
@@ -206,25 +209,28 @@ class PeriodicTrainingCallback(BaseCallback):
         self.next_eval_step = _next_multiple(current_timesteps, self.evaluation_settings.frequency)
         self.action_labels = self._load_action_labels()
 
+    # Se ejecuta en CADA paso del entrenamiento. Decide cuando evaluar y cuando guardar checkpoint.
     def _on_step(self) -> bool:
-        self._record_actions()
+        self._record_actions()  # cuenta que acciones esta usando el agente (para estadisticas)
         if self.num_timesteps >= self.next_eval_step:
-            self._run_periodic_evaluation()
+            self._run_periodic_evaluation()  # evalua el modelo cada 'frequency' pasos
             if self.early_stopping.stopped:
-                return False
+                return False  # devolver False detiene el entrenamiento (early stopping)
             self.next_eval_step += self.evaluation_settings.frequency
 
         if self.num_timesteps >= self.next_checkpoint_step:
-            self._save_periodic_checkpoint()
+            self._save_periodic_checkpoint()  # guarda un checkpoint periodico
             self.next_checkpoint_step += self.profile.checkpoint_frequency
-        return True
+        return True  # True = seguir entrenando
 
     def _on_training_end(self) -> None:
         self.eval_env.close()
 
+    # Evalua el modelo actual jugando varios episodios de prueba y mide la recompensa media.
     def _run_periodic_evaluation(self) -> None:
-        self.eval_env.seed(self.evaluation_settings.seed)
+        self.eval_env.seed(self.evaluation_settings.seed)  # misma semilla -> evaluacion comparable
         previous_best_mean_reward = self.best_mean_reward
+        # Juega N episodios de forma DETERMINISTA (sin azar) para medir el desempeno real.
         rewards, lengths = cast(
             tuple[list[float], list[int]],
             evaluate_policy(
@@ -288,6 +294,7 @@ class PeriodicTrainingCallback(BaseCallback):
         if self.verbose and self.early_stopping.stopped and self.early_stopping.stop_reason:
             print_block("Early Stopping", [self.early_stopping.stop_reason])
 
+        # Si esta evaluacion supero el mejor resultado historico, guarda este modelo como el "best".
         if self.evaluation_settings.save_best and improved:
             self.best_mean_reward = mean_reward
             self.best_checkpoint_updated = True

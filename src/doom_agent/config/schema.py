@@ -40,12 +40,13 @@ class RewardShapingConfig:
     clip_min: float | None = None
     clip_max: float | None = None
 
+    # Transforma la recompensa cruda del juego: la desplaza (offset), la escala y la recorta.
     def apply(self, reward: float) -> float:
-        shaped_reward = (reward + self.offset) * self.scale
+        shaped_reward = (reward + self.offset) * self.scale  # desplaza y escala
         if self.clip_min is not None and shaped_reward < self.clip_min:
-            shaped_reward = self.clip_min
+            shaped_reward = self.clip_min  # piso: evita recompensas muy negativas
         if self.clip_max is not None and shaped_reward > self.clip_max:
-            shaped_reward = self.clip_max
+            shaped_reward = self.clip_max  # techo: evita recompensas muy grandes
         return float(shaped_reward)
 
     def validate(self) -> None:
@@ -131,16 +132,18 @@ class CurriculumStageConfig:
         )
 
 
+# Objeto central de configuracion: junta TODA la config de una corrida de entrenamiento
+# (hiperparametros del algoritmo, escenario, observacion, reward shaping, exploracion, etc.).
 @dataclass(frozen=True, slots=True)
 class TrainingProfile:
-    scenario_name: str
-    learning_rate: float
-    n_steps: int
-    batch_size: int
-    n_epochs: int
-    gamma: float
-    gae_lambda: float
-    ent_coef: float
+    scenario_name: str  # archivo .cfg del escenario ViZDoom
+    learning_rate: float  # paso de aprendizaje
+    n_steps: int  # pasos por rollout y horizonte del BPTT
+    batch_size: int  # muestras por minibatch
+    n_epochs: int  # pasadas de aprendizaje por lote
+    gamma: float  # descuento de la recompensa futura
+    gae_lambda: float  # sesgo/varianza de la ventaja (GAE)
+    ent_coef: float  # fuerza de exploracion (bonus de entropia)
     requested_timesteps: int
     render: bool
     record_video: bool
@@ -206,7 +209,9 @@ class TrainingProfile:
     def scenario_path(self, paths: ProjectPaths) -> Path:
         return paths.scenarios_dir / self.scenario_name
 
+    # Valida la config ANTES de entrenar para fallar temprano si hay algo invalido.
     def validate(self, paths: ProjectPaths) -> None:
+        # Estos campos deben ser estrictamente positivos.
         positive_fields = {
             "learning_rate": self.learning_rate,
             "n_steps": self.n_steps,
