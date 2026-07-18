@@ -32,7 +32,7 @@ from doom_agent.utils.checkpoints import (
 )
 from doom_agent.utils.console import print_kv_block
 
-DEMO_STEP_DELAY_SECONDS = 0.5
+DEMO_STEP_DELAY_SECONDS = 0.05
 
 
 def infer_legacy_profile(checkpoint_stem: Path) -> TrainingProfile:
